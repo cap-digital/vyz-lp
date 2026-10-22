@@ -33,11 +33,11 @@ function Steps({ step, max, onGo }: { step: number; max: number; onGo: (s: numbe
       {STEPS.map((label, i) => {
         const n = i + 1;
         return (
-          <li key={label} className="min-w-[7rem] flex-1">
+          <li key={label} className="min-w-[2.5rem] flex-1 sm:min-w-[7rem]">
             <button type="button" disabled={n > max} onClick={() => onGo(n)} aria-current={n === step ? "step" : undefined} className="flex w-full flex-col gap-1.5 text-left">
               <span className={`h-[var(--cut)] w-full rounded-full ${n <= step ? "bg-accent" : "bg-line"}`} />
               <span className={`flex items-center gap-1.5 text-[12.5px] ${n === step ? "font-semibold" : n < step ? "" : "text-fg-2"}`}>
-                <span className="tnum">{String(n).padStart(2, "0")}</span> {label}
+                <span className="tnum">{String(n).padStart(2, "0")}</span> <span className={n === step ? "" : "hidden sm:inline"}>{label}</span>
                 {n < step && <Check size={13} aria-hidden className="text-accent" />}
               </span>
             </button>

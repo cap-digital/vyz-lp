@@ -87,7 +87,7 @@ function ActiveBottomNav({ onMore }: { onMore: () => void }) {
 export function PlanSimulator({ compact = false }: { compact?: boolean }) {
   const { ws, update } = useWorkspace();
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className={`flex items-center gap-2 ${compact ? "" : "flex-wrap"}`}>
       <label className="flex items-center gap-2 text-[13px] text-fg-2">
         {!compact && <span>Simular plano</span>}
         <select
@@ -103,7 +103,10 @@ export function PlanSimulator({ compact = false }: { compact?: boolean }) {
           ))}
         </select>
       </label>
-      <PendingChip label="Precisa conectar Supabase" detail="O plano real virá da conta. Por enquanto, escolha um plano para testar os limites e os bloqueios." />
+      <PendingChip
+        label={compact ? "Simulado" : "Precisa conectar Supabase"}
+        detail="Precisa conectar Supabase · o plano real virá da conta. Por enquanto, escolha um plano para testar os limites e os bloqueios."
+      />
     </div>
   );
 }

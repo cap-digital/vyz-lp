@@ -137,7 +137,7 @@ const CAMPAIGNS: Record<Profile, string[]> = {
   executivo: ["Prospecção · Advantage+", "Remarketing · Catálogo", "Pesquisa · Marca", "Performance Max", "Prospecção · Interesses"],
   marketplace: ["Produtos patrocinados · Top 20", "Marca · Loja oficial", "Ofertas relâmpago", "Catálogo completo"],
   site: ["Orgânico", "Direto", "Mídia paga", "E-mail", "Referência"],
-  infoproduto: ["Captação · Aula gratuita", "Remarketing · Carrinho", "Pesquisa · Nome do curso", "Lookalike · Compradores"],
+  infoproduto: ["Captação · Aula ao vivo", "Remarketing · Carrinho", "Pesquisa · Nome do curso", "Lookalike · Compradores"],
   leads: ["Formulário · Lookalike 1%", "Pesquisa · Serviço", "Formulário · Interesses", "Remarketing · Site"],
   imob: ["Empr. A · Lançamento", "Empr. B · Últimas unidades", "Pesquisa · Apartamento", "Empr. C · Decorado"],
   local: ["Mensagens · Raio 5 km", "Pesquisa · Perto de mim", "Mensagens · Remarketing", "Ligações · Pesquisa"],
@@ -206,7 +206,9 @@ export const MockSource: DataSource = {
     const ads = spec.sources.filter(isAdPlatform);
     const adPlatforms = ads.length ? ads : spec.profile === "site" ? [] : (["meta"] as PlatformId[]);
 
-    const spendDay = r.range(...p.spendDay);
+    // com verba informada, o investimento acompanha a verba (pacing plausível)
+    const drawn = r.range(...p.spendDay);
+    const spendDay = spec.budget && p.spendDay[1] > 0 ? (spec.budget / 30) * (0.88 + (drawn / p.spendDay[1]) * 0.18) : drawn;
     const cpa = r.range(...p.cpa);
     const roas = p.roas ? r.range(...p.roas) : 0;
     const ticket = roas * cpa;

@@ -1,0 +1,44 @@
+# VYZ · Pendências (fase 1: só front-end)
+
+O que hoje funciona só no navegador e depende de backend, de integração ou de uma decisão. No produto, cada item aparece com um aviso discreto (`PendingChip`).
+
+## Precisa de backend (Supabase)
+
+| Item | Como está hoje | Aviso no produto |
+|---|---|---|
+| Login, workspace e membros da equipe | Workspace único, salvo no navegador | "Precisa conectar Supabase" (topo do painel e Configurações) |
+| Plano real da conta | Seletor "Simular plano" (Base, Pro, Avançado, Personalizado) | "Precisa conectar Supabase · o plano real virá da conta" |
+| Persistência | `LocalStore` (localStorage, `vyz:v1:`). Trocar por `SupabaseStore` com a mesma interface `Store` (`src/lib/store/store.ts`) | — |
+| Links compartilhados com dados reais | `/r/[id]#payload`: configuração comprimida no fragmento, dados de amostra | "Links com dados reais e revogação precisam do Supabase" |
+| Revogar link | Vale só no navegador de quem revogou | idem |
+| Relatórios agendados (PDF por e-mail, resumo no WhatsApp) | Agendamento salvo localmente, sem envio | "Envio agendado precisa de backend" |
+| Histórico de exportações entre aparelhos | Só neste navegador | — |
+| Dashboards e LPs em outro aparelho | Só neste navegador (o link público e a prévia de LP funcionam em qualquer um) | Estado vazio explica |
+
+## Precisa de integração com as plataformas
+
+| Item | Como está hoje | Aviso no produto |
+|---|---|---|
+| Conexão das contas (OAuth Meta, Google Ads, GA4, TikTok, LinkedIn, Mercado Ads, Shopee, CRMs) | Cadastro por ID com validação de formato; status "Aguardando conexão" | "Conexão automática (OAuth) em breve" |
+| Dados reais nos widgets | `MockSource` determinística (seed por dashboard). Criar `DbSource` com a interface `DataSource` (`src/features/metrics/source.ts`) | "Dados reais precisam de conexão" + "Amostra · dados fictícios" |
+| Venda deduplicada, CTR ponderado e maturação | Regras prontas em `features/metrics/compute.ts`, aplicadas aos dados de amostra | — |
+| Análise por áudio | Página "em breve" | "em breve" |
+
+## Precisa de hospedagem
+
+| Item | Como está hoje | Aviso no produto |
+|---|---|---|
+| Publicar LP no subdomínio (`slug.vyz.app`) | Só a prévia em `/p/[id]#conteúdo` | "Publicação precisa de hospedagem" |
+| Teste do disparo de GTM, Pixel e conversões | Só validação de formato dos IDs | "Teste do disparo precisa de publicação" |
+| Domínio do site (`metadataBase`) | Não definido: a URL da imagem Open Graph sai relativa ao host | — |
+
+## Decisões em aberto
+
+- **Limites de quantidade por plano** (em `features/pricing/entitlements.ts`), definidos provisoriamente:
+  - Dashboards: Base 2 (como na LP), Pro 10, Avançado 20, Personalizado 50.
+  - Landing pages publicadas: Base 1, Pro 3, Avançado 10, Personalizado 10.
+  - Contas contratadas: vêm do plano simulado (padrão 2, como na simulação da LP).
+- **Subdomínio das LPs**: o painel mostra `slug.vyz.app` como exemplo; o domínio real ainda não existe.
+- **Número de WhatsApp**: provisório (`WHATSAPP_NUMBER` em `features/pricing/pricing.ts`).
+- **`robots: noindex`**: segue ligado em todas as áreas, com o `// TODO: remover no lançamento`.
+- **Lighthouse mobile ≥ 90 na LP**: as medições locais oscilaram entre 83 e 93 (máquina carregada). O LCP real acontece na primeira pintura; a nota é puxada pelo JavaScript (React, runtime do Next e motion). Medir no PageSpeed depois do deploy.

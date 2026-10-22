@@ -36,17 +36,17 @@ function Stepper({ step, onGo, max }: { step: number; onGo: (s: number) => void;
         const done = n < step;
         const current = n === step;
         return (
-          <li key={label} className="min-w-0 flex-1">
+          <li key={label} className={step === i + 1 ? "min-w-0 flex-[3] sm:flex-1" : "min-w-0 flex-1"}>
             <button
               type="button"
               disabled={n > max}
               onClick={() => onGo(n)}
               aria-current={current ? "step" : undefined}
-              className="group flex w-full min-w-[7.5rem] flex-col gap-1.5 text-left disabled:cursor-default"
+              className="group flex w-full min-w-[2.5rem] flex-col gap-1.5 text-left disabled:cursor-default sm:min-w-[7.5rem]"
             >
               <span className={`h-[var(--cut)] w-full rounded-full ${done || current ? "bg-accent" : "bg-line"}`} />
               <span className={`flex items-center gap-1.5 text-[12.5px] ${current ? "font-semibold text-fg" : done ? "text-fg" : "text-fg-2"}`}>
-                <span className="tnum">{String(n).padStart(2, "0")}</span> {label}
+                <span className="tnum">{String(n).padStart(2, "0")}</span> <span className={n === step ? "" : "hidden sm:inline"}>{label}</span>
                 {done && <Check size={13} aria-hidden className="text-accent" />}
               </span>
             </button>

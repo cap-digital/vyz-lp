@@ -73,7 +73,7 @@ export function LineChart({ values, avg, previous, goal, maturingDays = 0, goalL
         )}
         {maturingDays > 0 && (
           <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-[2px] bg-accent-soft" /> em maturação
+            <span className="size-2 rounded-[2px] bg-accent/30" /> em maturação
           </span>
         )}
       </figcaption>
@@ -84,7 +84,7 @@ export function LineChart({ values, avg, previous, goal, maturingDays = 0, goalL
         ))}
 
         {maturingDays > 0 && (
-          <rect className="m-late" style={{ "--d": "1500ms" } as CSSProperties} x={matX} y={PAD.t} width={plotRight - matX + 2} height={H - PAD.t - PAD.b} fill="var(--accent-soft)" opacity="0.6" rx="3" />
+          <rect className="m-late" style={{ "--d": "1500ms" } as CSSProperties} x={matX} y={PAD.t} width={plotRight - matX + 2} height={H - PAD.t - PAD.b} fill="var(--accent)" opacity="0.14" rx="3" />
         )}
 
         {previous && <path d={path(previous)} fill="none" stroke="var(--muted)" strokeWidth="1" strokeDasharray="2 3" opacity="0.8" />}
