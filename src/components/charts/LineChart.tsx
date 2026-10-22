@@ -17,18 +17,41 @@ type LineChartProps = {
   summary: string;
   /** Marca a linha da meta (alvo da intro da LP). */
   markGoal?: boolean;
+  /** Largura e altura medidas: desenha em tamanho real (sem escala). */
+  width?: number;
   height?: number;
+  /** Texto da etiqueta da meta (no tamanho real, em px). */
+  fontSize?: number;
+  /** Legenda em cima (desligue quando ela vem de fora). */
+  showLegend?: boolean;
 };
-
-const W = 320;
-const PAD = { l: 4, r: 50, t: 8, b: 6 };
 
 /**
  * Linha diária com média móvel, meta e dias em maturação. Os rótulos ficam
  * fora do traçado: legenda em cima e etiqueta da meta na margem direita.
+ * Sem width/height, escala no contêiner; com eles, desenha em tamanho real.
  */
-export function LineChart({ values, avg, previous, goal, maturingDays = 0, goalLabel, summary, markGoal, height = 132 }: LineChartProps) {
-  const H = height;
+export function LineChart({
+  values,
+  avg,
+  previous,
+  goal,
+  maturingDays = 0,
+  goalLabel,
+  summary,
+  markGoal,
+  width,
+  height,
+  fontSize = 8.5,
+  showLegend = true,
+}: LineChartProps) {
+  const real = width !== undefined && height !== undefined;
+  const W = width ?? 320;
+  const H = height ?? 132;
+  const tagW = goalLabel ? Math.max(30, goalLabel.length * fontSize * 0.58 + 12) : 0;
+  const tagH = fontSize + 6;
+  const PAD = { l: 4, r: Math.max(50, tagW + 10), t: 8, b: 6 };
+
   const finite = (v: number[]) => v.filter(Number.isFinite);
   // a escala ignora os dias em maturação (o custo do dia dispara enquanto as
   // conversões não chegam); o pico fica preso no topo da área
@@ -47,37 +70,19 @@ export function LineChart({ values, avg, previous, goal, maturingDays = 0, goalL
   const matX = maturingDays ? x(n - maturingDays) - 3 : 0;
   const lastAvg = avg ? [...avg].reverse().findIndex(Number.isFinite) : -1;
   const lastIdx = lastAvg >= 0 && avg ? avg.length - 1 - lastAvg : -1;
-  const tagW = goalLabel ? Math.max(30, goalLabel.length * 4.9 + 10) : 0;
   const plotRight = W - PAD.r;
 
   return (
     <figure className="m-0">
-      <figcaption className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] leading-none text-fg-2" aria-hidden>
-        {avg && (
-          <span className="inline-flex items-center gap-1">
-            <span className="h-[2.5px] w-3 rounded-full bg-accent" /> média 7 dias
-          </span>
-        )}
-        <span className="inline-flex items-center gap-1">
-          <span className="h-px w-3 bg-muted" /> dia a dia
-        </span>
-        {goal !== undefined && (
-          <span className="inline-flex items-center gap-1">
-            <span className="w-3 border-t border-dashed border-fg-2" /> meta
-          </span>
-        )}
-        {previous && (
-          <span className="inline-flex items-center gap-1">
-            <span className="w-3 border-t border-dotted border-muted" /> período anterior
-          </span>
-        )}
-        {maturingDays > 0 && (
-          <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-[2px] bg-accent/30" /> em maturação
-          </span>
-        )}
-      </figcaption>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary} className="block h-auto w-full overflow-visible">
+      {showLegend && <LineLegend avg={!!avg} goal={goal !== undefined} previous={!!previous} maturing={maturingDays > 0} />}
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        width={real ? W : undefined}
+        height={real ? H : undefined}
+        role="img"
+        aria-label={summary}
+        className={`block overflow-visible ${real ? "" : "h-auto w-full"}`}
+      >
         <title>{summary}</title>
         {[0.25, 0.5, 0.75].map((f) => (
           <line key={f} x1={PAD.l} x2={plotRight} y1={PAD.t + f * (H - PAD.t - PAD.b)} y2={PAD.t + f * (H - PAD.t - PAD.b)} stroke="var(--line)" strokeWidth="1" />
@@ -93,9 +98,9 @@ export function LineChart({ values, avg, previous, goal, maturingDays = 0, goalL
           <g>
             <line data-intro-target={markGoal ? "" : undefined} x1={PAD.l} x2={plotRight} y1={y(goal)} y2={y(goal)} stroke="var(--fg-2)" strokeWidth="1" strokeDasharray="4 4" opacity="0.85" />
             {goalLabel && (
-              <g transform={`translate(${plotRight + 4} ${y(goal) - 7})`}>
-                <rect width={tagW} height="14" rx="3" fill="var(--bg)" stroke="var(--line)" />
-                <text x={tagW / 2} y="10" textAnchor="middle" fontSize="8.5" fill="var(--fg-2)" className="tnum">
+              <g transform={`translate(${plotRight + 4} ${Math.min(H - tagH, Math.max(0, y(goal) - tagH / 2))})`}>
+                <rect width={tagW} height={tagH} rx="3" fill="var(--bg)" stroke="var(--line)" />
+                <text x={tagW / 2} y={tagH / 2 + fontSize * 0.36} textAnchor="middle" fontSize={fontSize} fill="var(--fg-2)" className="tnum">
                   {goalLabel}
                 </text>
               </g>
@@ -121,5 +126,36 @@ export function LineChart({ values, avg, previous, goal, maturingDays = 0, goalL
         )}
       </svg>
     </figure>
+  );
+}
+
+/** Legenda da linha (fora do traçado). */
+export function LineLegend({ avg, goal, previous, maturing, large = false }: { avg: boolean; goal: boolean; previous: boolean; maturing: boolean; large?: boolean }) {
+  return (
+    <p className={`mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 leading-none text-fg-2 ${large ? "text-[12px]" : "text-[10px]"}`} aria-hidden>
+      {avg && (
+        <span className="inline-flex items-center gap-1">
+          <span className="h-[2.5px] w-3 rounded-full bg-accent" /> média 7 dias
+        </span>
+      )}
+      <span className="inline-flex items-center gap-1">
+        <span className="h-px w-3 bg-muted" /> dia a dia
+      </span>
+      {goal && (
+        <span className="inline-flex items-center gap-1">
+          <span className="w-3 border-t border-dashed border-fg-2" /> meta
+        </span>
+      )}
+      {previous && (
+        <span className="inline-flex items-center gap-1">
+          <span className="w-3 border-t border-dotted border-muted" /> período anterior
+        </span>
+      )}
+      {maturing && (
+        <span className="inline-flex items-center gap-1">
+          <span className="size-2 rounded-[2px] bg-accent/30" /> em maturação
+        </span>
+      )}
+    </p>
   );
 }

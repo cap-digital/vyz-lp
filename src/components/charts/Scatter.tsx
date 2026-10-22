@@ -1,49 +1,84 @@
 import type { CSSProperties } from "react";
+import { aroundPoint, cornersOf, placeLabel, textWidth, type Rect } from "./labels";
 
 type Point = { name: string; invest: number; cpl: number; bad?: boolean };
 
-const W = 320;
-const H = 160;
-const PAD = { l: 14, r: 10, t: 10, b: 18 };
+const QUADRANT_TEXT = "gasta muito · lead caro";
+
+/**
+ * Posições do gráfico (pura, testada): pontos, área do quadrante "ruim" e os
+ * dois rótulos já sem colisão.
+ */
+export function scatterLayout(points: Point[], W: number, H: number, fontSize: number) {
+  const pad = { l: fontSize + 8, r: 10, t: 10, b: fontSize + 10 };
+  const plot: Rect = { x: pad.l, y: pad.t, w: W - pad.l - pad.r, h: H - pad.t - pad.b };
+  const r = Math.max(5, fontSize * 0.5);
+  const dots = points.map((p) => ({ ...p, cx: plot.x + p.invest * plot.w, cy: plot.y + (1 - p.cpl) * plot.h, r: p.bad ? r + 1.5 : r }));
+  const dotRects: Rect[] = dots.map((d) => ({ x: d.cx - d.r, y: d.cy - d.r, w: d.r * 2, h: d.r * 2 }));
+
+  const quadrant: Rect = { x: plot.x + plot.w * 0.6, y: plot.y, w: plot.w * 0.4, h: plot.h * 0.38 };
+  const lh = fontSize + 8;
+  const qw = textWidth(QUADRANT_TEXT, fontSize) + 12;
+  const qLabel = placeLabel(cornersOf(quadrant, qw, lh, 4), dotRects, { ...plot, x: plot.x, w: plot.w });
+
+  const bad = dots.find((d) => d.bad);
+  let pLabel: Rect | null = null;
+  if (bad) {
+    const pw = textWidth(bad.name, fontSize) + 12;
+    const others = dotRects.filter((_, i) => dots[i] !== bad).concat(qLabel, { x: bad.cx - bad.r, y: bad.cy - bad.r, w: bad.r * 2, h: bad.r * 2 });
+    pLabel = placeLabel(aroundPoint(bad.cx, bad.cy, bad.r, pw, lh), others, plot);
+  }
+  return { plot, quadrant, dots, qLabel, pLabel, bad, lh };
+}
+
+type ScatterProps = { points: Point[]; width?: number; height?: number; fontSize?: number };
 
 /** Investimento × custo por lead, um ponto por empreendimento. O ruim fica em vermelho terroso. */
-export function Scatter({ points }: { points: Point[] }) {
-  const x = (v: number) => PAD.l + v * (W - PAD.l - PAD.r);
-  const y = (v: number) => PAD.t + (1 - v) * (H - PAD.t - PAD.b);
-  const bad = points.find((p) => p.bad);
+export function Scatter({ points, width, height, fontSize = 8.5 }: ScatterProps) {
+  // com largura e altura medidas, desenha em tamanho real; sem elas, escala no contêiner
+  const real = width !== undefined && height !== undefined;
+  const W = width ?? 320;
+  const H = height ?? 160;
+  const { plot, quadrant, dots, qLabel, pLabel, bad, lh } = scatterLayout(points, W, H, fontSize);
   const summary = `Dispersão de ${points.length} empreendimentos: investimento no eixo horizontal, custo por lead no vertical.${bad ? ` ${bad.name} gasta muito e tem lead caro.` : ""}`;
+  const baseline = (r: Rect) => r.y + lh / 2 + fontSize * 0.36;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary} className="block h-auto w-full overflow-visible">
+    <svg viewBox={`0 0 ${W} ${H}`} width={real ? W : undefined} height={real ? H : undefined} role="img" aria-label={summary} className={`block overflow-visible ${real ? "" : "h-auto w-full"}`}>
       <title>{summary}</title>
-      <line x1={PAD.l} x2={PAD.l} y1={PAD.t} y2={H - PAD.b} stroke="var(--line)" />
-      <line x1={PAD.l} x2={W - PAD.r} y1={H - PAD.b} y2={H - PAD.b} stroke="var(--line)" />
-      <text x={PAD.l + 2} y={H - 4} fontSize="8.5" fill="var(--fg-2)">
+      <rect className="m-late" style={{ "--d": "1300ms" } as CSSProperties} x={quadrant.x} y={quadrant.y} width={quadrant.w} height={quadrant.h} rx="4" fill="var(--error-soft)" opacity="0.7" />
+      <line x1={plot.x} x2={plot.x} y1={plot.y} y2={plot.y + plot.h} stroke="var(--line)" />
+      <line x1={plot.x} x2={plot.x + plot.w} y1={plot.y + plot.h} y2={plot.y + plot.h} stroke="var(--line)" />
+      <text x={plot.x} y={H - 3} fontSize={fontSize} fill="var(--fg-2)">
         investimento →
       </text>
-      <text x={4} y={PAD.t + 4} fontSize="8.5" fill="var(--fg-2)" transform={`rotate(-90 4 ${PAD.t + 4})`} textAnchor="end">
+      <text x={fontSize} y={plot.y + plot.h} fontSize={fontSize} fill="var(--fg-2)" transform={`rotate(-90 ${fontSize} ${plot.y + plot.h})`}>
         custo por lead →
       </text>
 
-      {bad && (
+      {dots.map((d, i) => (
+        <g key={d.name} className="m-pt" style={{ "--d": `${560 + i * 110}ms` } as CSSProperties}>
+          <circle cx={d.cx} cy={d.cy} r={d.r} fill={d.bad ? "#C9442E" : "var(--accent)"} />
+        </g>
+      ))}
+
+      {/* rótulo do quadrante: no canto livre do quadrante, com fundo */}
+      <g className="m-late" style={{ "--d": "1400ms" } as CSSProperties}>
+        <rect x={qLabel.x} y={qLabel.y} width={qLabel.w} height={qLabel.h} rx="4" fill="var(--card)" stroke="var(--error-soft)" />
+        <text x={qLabel.x + 6} y={baseline(qLabel)} fontSize={fontSize} fill="var(--error-fg)">
+          {QUADRANT_TEXT}
+        </text>
+      </g>
+
+      {/* rótulo do ponto ruim: ao lado do ponto, com fundo, sem sobrepor nada */}
+      {bad && pLabel && (
         <g className="m-late" style={{ "--d": "1500ms" } as CSSProperties}>
-          <rect x={x(0.6)} y={PAD.t - 2} width={x(1) - x(0.6) + 6} height={y(0.62) - PAD.t} rx="4" fill="var(--error-soft)" />
-          <text x={x(0.6) + 6} y={PAD.t + 10} fontSize="8.5" fill="var(--error-fg)">
-            gasta muito · lead caro
+          <rect x={pLabel.x} y={pLabel.y} width={pLabel.w} height={pLabel.h} rx="4" fill="var(--card)" stroke="var(--line)" />
+          <text x={pLabel.x + 6} y={baseline(pLabel)} fontSize={fontSize} fontWeight="700" fill="var(--fg)">
+            {bad.name}
           </text>
         </g>
       )}
-
-      {points.map((p, i) => (
-        <g key={p.name} className="m-pt" style={{ "--d": `${560 + i * 110}ms` } as CSSProperties}>
-          <circle cx={x(p.invest)} cy={y(p.cpl)} r={p.bad ? 7 : 5.5} fill={p.bad ? "#C9442E" : "var(--accent)"} />
-          {p.bad && (
-            <text x={x(p.invest) - 10} y={y(p.cpl) + 3} textAnchor="end" fontSize="9" fontWeight="700" fill="var(--fg)">
-              {p.name}
-            </text>
-          )}
-        </g>
-      ))}
     </svg>
   );
 }

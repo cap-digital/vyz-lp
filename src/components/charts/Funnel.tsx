@@ -16,27 +16,34 @@ export function biggestDrop(steps: { pct: number }[]): number {
   return idx;
 }
 
-/** Funil com a passagem entre etapas e a maior queda marcada em vermelho terroso. */
-export function Funnel({ steps, title }: { steps: { label: string; pct: number }[]; title: string }) {
+type FunnelProps = {
+  steps: { label: string; pct: number }[];
+  title: string;
+  /** "lg": texto de leitura (painel de "Como funciona"). */
+  size?: "sm" | "lg";
+  /** Distribui as etapas na altura toda do contêiner. */
+  fill?: boolean;
+};
+
+/** Funil com a passagem entre etapas e a maior queda marcada em vermelho terroso. Barras com 10 px ou mais. */
+export function Funnel({ steps, title, size = "sm", fill = false }: FunnelProps) {
   const drop = biggestDrop(steps);
+  const lg = size === "lg";
   const summary = `${title}: ${steps.map((s) => `${s.label} ${s.pct}%`).join(", ")}. Maior queda antes de ${steps[drop].label}.`;
   return (
-    <div role="img" aria-label={summary}>
-      <ul className="space-y-2" aria-hidden>
+    <div role="img" aria-label={summary} className={fill ? "h-full" : ""}>
+      <ul className={fill ? "flex h-full flex-col justify-between gap-2" : lg ? "space-y-3" : "space-y-2"} aria-hidden>
         {steps.map((s, i) => (
           <li key={s.label}>
-            <div className="flex items-baseline justify-between text-[11px] leading-tight">
+            <div className={`flex items-baseline justify-between leading-tight ${lg ? "text-[13px]" : "text-[11px]"}`}>
               <span className="text-fg">{s.label}</span>
               <span className="font-bold tnum text-fg">{s.pct}%</span>
             </div>
-            <div className="mt-1 h-2 w-full">
-              <div
-                className="m-bar h-full rounded-[2px]"
-                style={{ width: `${Math.max(2, s.pct)}%`, background: SEQ[i], "--d": `${620 + i * 140}ms` } as CSSProperties}
-              />
+            <div className={`mt-1 w-full ${lg ? "h-3" : "h-2.5"}`}>
+              <div className="m-bar h-full rounded-[3px]" style={{ width: `${Math.max(2, s.pct)}%`, background: SEQ[i], "--d": `${620 + i * 140}ms` } as CSSProperties} />
             </div>
             {i === drop && (
-              <p className="m-blink mt-0.5 text-[10px] font-semibold text-error-fg" style={{ "--d": `${900 + steps.length * 140}ms` } as CSSProperties}>
+              <p className={`m-blink mt-0.5 font-semibold text-error-fg ${lg ? "text-[12px]" : "text-[10px]"}`} style={{ "--d": `${900 + steps.length * 140}ms` } as CSSProperties}>
                 ↓ maior queda
               </p>
             )}

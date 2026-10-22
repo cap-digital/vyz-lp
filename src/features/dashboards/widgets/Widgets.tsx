@@ -66,7 +66,8 @@ function Delta({ cur, prev, id, profile, suffix = "" }: { cur: number; prev: num
 
 // ---- KPI ------------------------------------------------------------------
 
-export function Kpi({ spec, ctx, delay }: { spec: KpiSpec; ctx: WidgetContext; delay: number }) {
+export function Kpi({ spec, ctx, delay, size = "md" }: { spec: KpiSpec; ctx: WidgetContext; delay: number; size?: "md" | "lg" }) {
+  const lg = size === "lg";
   const { cur, prev, ds, profile } = ctx;
   const def = metric(spec.metric, profile);
   const hidden = ctx.hideSpend && spec.metric === "spend";
@@ -100,15 +101,15 @@ export function Kpi({ spec, ctx, delay }: { spec: KpiSpec; ctx: WidgetContext; d
 
   return (
     <div
-      className={`m-in min-w-0 rounded-[10px] border p-2.5 ${strong ? "border-transparent bg-accent text-on-accent" : "border-line bg-card"}`}
+      className={`m-in min-w-0 rounded-[10px] border ${lg ? "p-3.5" : "p-2.5"} ${strong ? "border-transparent bg-accent text-on-accent" : "border-line bg-card"}`}
       style={{ "--d": `${delay}ms` } as CSSProperties}
       title={def.help}
     >
-      <p className={`min-h-[2.3em] text-[9.5px] leading-[1.15] font-medium tracking-[0.08em] uppercase ${strong ? "" : "text-fg-2"}`}>{def.label}</p>
-      <p className={`mt-1 leading-none font-bold tracking-[-0.02em] ${value.length > 10 ? "text-[15px] @[900px]:text-[18px]" : "text-[17px] @[900px]:text-[21px]"}`}>
+      <p className={`min-h-[2.3em] leading-[1.15] font-medium tracking-[0.08em] uppercase ${lg ? "text-[11px]" : "text-[9.5px]"} ${strong ? "" : "text-fg-2"}`}>{def.label}</p>
+      <p className={`mt-1 leading-none font-bold tracking-[-0.02em] ${lg ? "text-[22px] @[760px]:text-[26px]" : value.length > 10 ? "text-[15px] @[900px]:text-[18px]" : "text-[17px] @[900px]:text-[21px]"}`}>
         <Odometer value={value} />
       </p>
-      <p className={`mt-1.5 text-[10px] leading-tight ${strong ? "[&_span]:text-inherit" : "text-fg-2"}`}>{sub}</p>
+      <p className={`mt-1.5 leading-tight ${lg ? "text-[12px]" : "text-[10px]"} ${strong ? "[&_span]:text-inherit" : "text-fg-2"}`}>{sub}</p>
     </div>
   );
 }
@@ -116,20 +117,15 @@ export function Kpi({ spec, ctx, delay }: { spec: KpiSpec; ctx: WidgetContext; d
 // ---- widgets ----------------------------------------------------------------
 
 export function Widget({ spec, ctx, delay }: { spec: WidgetSpec; ctx: WidgetContext; delay: number }) {
-  const { ds, profile, cur } = ctx;
+  const { ds, cur } = ctx;
   const title = spec.title;
 
   switch (spec.type) {
     case "line": {
-      const values = series(ds.current, spec.metric);
-      const avg = maturedAverage(ds.current, spec.metric);
-      const def = metric(spec.metric, profile);
-      const goal = spec.goal ? ds.goal : undefined;
-      const last = avg.filter(Number.isFinite).at(-1) ?? 0;
-      const summary = `${def.label} diário dos últimos ${values.length} dias, com média móvel de 7 dias em ${formatValue(last, def.format)}${goal ? `, meta de ${brl(goal)}` : ""}. Os últimos 3 dias estão em maturação.`;
+      const d = lineData(spec, ctx);
       return (
         <Card title={title} delay={delay}>
-          <LineChart values={values} avg={avg} previous={ctx.showPrevious && ds.previous.length === values.length ? series(ds.previous, spec.metric) : undefined} goal={goal} goalLabel={goal ? brl(goal, { decimals: false }) : undefined} maturingDays={3} summary={summary} markGoal={ctx.markGoal} />
+          <LineChart {...d} previous={ctx.showPrevious && ds.previous.length === d.values.length ? series(ds.previous, spec.metric) : undefined} markGoal={ctx.markGoal} />
         </Card>
       );
     }
@@ -267,7 +263,10 @@ export function Widget({ spec, ctx, delay }: { spec: WidgetSpec; ctx: WidgetCont
   }
 }
 
-function BarsWidget({ spec, ctx }: { spec: Extract<WidgetSpec, { type: "bars" }>; ctx: WidgetContext }) {
+type BarsSpec = Extract<WidgetSpec, { type: "bars" }>;
+
+/** Dados das barras (mesmo cálculo no painel e no "Como funciona" da LP). */
+export function barData(spec: BarsSpec, ctx: WidgetContext) {
   const { ds, profile, cur } = ctx;
   let items: { label: string; value: number; display: string }[] = [];
   const fmt = (v: number) =>
@@ -294,10 +293,26 @@ function BarsWidget({ spec, ctx }: { spec: Extract<WidgetSpec, { type: "bars" }>
       : spec.reference === "goal"
         ? { value: ds.goal, label: `meta ${brl(ds.goal, { decimals: false })}` }
         : undefined;
-  const better = spec.metric === "cpa" ? "down" : "up";
+  const better: "up" | "down" = spec.metric === "cpa" ? "down" : "up";
   const def = metric(spec.metric === "roas" ? "roas" : spec.metric === "cpa" ? "cpa" : spec.metric === "spend" ? "spend" : "conversions", profile);
   const summary = `${def.label} por item: ${items.map((i) => `${i.label} ${i.display}`).join(", ")}.${reference ? ` Referência: ${reference.label}.` : ""} Total do período: ${formatValue(cur[def.id], def.format)}.`;
-  return <BarList items={items} reference={reference} better={better} summary={summary} />;
+  return { items, reference, better, summary };
+}
+
+function BarsWidget({ spec, ctx }: { spec: BarsSpec; ctx: WidgetContext }) {
+  return <BarList {...barData(spec, ctx)} />;
+}
+
+/** Dados da linha diária + média móvel (mesmo cálculo no painel e na LP). */
+export function lineData(spec: Extract<WidgetSpec, { type: "line" }>, ctx: WidgetContext) {
+  const { ds, profile } = ctx;
+  const values = series(ds.current, spec.metric);
+  const avg = maturedAverage(ds.current, spec.metric);
+  const def = metric(spec.metric, profile);
+  const goal = spec.goal ? ds.goal : undefined;
+  const last = avg.filter(Number.isFinite).at(-1) ?? 0;
+  const summary = `${def.label} diário dos últimos ${values.length} dias, com média móvel de 7 dias em ${formatValue(last, def.format)}${goal ? `, meta de ${brl(goal)}` : ""}. Os últimos 3 dias estão em maturação.`;
+  return { values, avg, goal, goalLabel: goal ? brl(goal, { decimals: false }) : undefined, maturingDays: 3, summary };
 }
 
 function PlatformCards({ ctx }: { ctx: WidgetContext }) {

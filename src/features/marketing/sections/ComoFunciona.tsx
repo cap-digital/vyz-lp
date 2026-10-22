@@ -1,12 +1,13 @@
 "use client";
 
 import { MousePointerClick } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useInView, useReducedMotion } from "motion/react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CutReveal } from "@/components/motion/CutReveal";
 import { Reveal } from "@/components/motion/Reveal";
 import { SectionWipe } from "@/components/motion/SectionWipe";
 import { PromptHeadline } from "./PromptHeadline";
-import { StoryPanel } from "./StoryPanel";
+import { StoryStage, type SceneKey } from "./StoryPanel";
 import { WhyCards } from "./WhyCards";
 
 const STEPS = [
@@ -24,22 +25,108 @@ const STEPS = [
   },
 ];
 
-export function ComoFunciona() {
+/** Passo ativo numa faixa central da viewport, com histerese de 120 ms. */
+function useActiveStep(count: number) {
   const [active, setActive] = useState(0);
-  const refs = useRef<(HTMLLIElement | null)[]>([]);
-
+  const refs = useRef<(HTMLElement | null)[]>([]);
   useEffect(() => {
+    let timer = 0;
+    let candidate = -1;
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
-          if (e.isIntersecting) setActive(Number((e.target as HTMLElement).dataset.step));
+          if (!e.isIntersecting) continue;
+          const i = Number((e.target as HTMLElement).dataset.step);
+          if (i === candidate) continue;
+          candidate = i;
+          window.clearTimeout(timer);
+          // só troca se o passo continuar na faixa por 120 ms (sem troca dupla)
+          timer = window.setTimeout(() => setActive(candidate), 120);
         }
       },
-      { rootMargin: "-48% 0px -48% 0px" },
+      { rootMargin: "-45% 0px -45% 0px" },
     );
-    refs.current.forEach((el) => el && io.observe(el));
-    return () => io.disconnect();
+    refs.current.slice(0, count).forEach((el) => el && io.observe(el));
+    return () => {
+      io.disconnect();
+      window.clearTimeout(timer);
+    };
+  }, [count]);
+  return { active, refs };
+}
+
+/** Desktop (com sticky) ou celular (painéis inline). */
+function useDesktop() {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia("(min-width: 1024px)");
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    () => window.matchMedia("(min-width: 1024px)").matches,
+    () => false,
+  );
+}
+
+/**
+ * Troca automática de template no passo 2: só com o passo visível, o usuário
+ * parado há 1 s e antes do primeiro clique nos chips.
+ */
+function useAutoTemplate(enabled: boolean, onTick: () => void) {
+  const tickRef = useRef(onTick);
+  useEffect(() => {
+    tickRef.current = onTick;
+  }, [onTick]);
+  useEffect(() => {
+    if (!enabled) return;
+    let lastScroll = performance.now();
+    let lastSwitch = performance.now();
+    const onScroll = () => {
+      lastScroll = performance.now();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    const iv = window.setInterval(() => {
+      const now = performance.now();
+      if (now - lastScroll >= 1000 && now - lastSwitch >= 3500) {
+        lastSwitch = now;
+        tickRef.current();
+      }
+    }, 250);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.clearInterval(iv);
+    };
+  }, [enabled]);
+}
+
+/** Painel inline do celular: monta quando chega perto da tela e fica montado. */
+function InlineStage({ step, template, onPickTemplate }: { step: number; template: SceneKey; onPickTemplate: (k: SceneKey) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const near = useInView(ref, { once: true, margin: "200px 0px" });
+  return (
+    <div ref={ref} className="mt-6 lg:hidden">
+      <StoryStage step={step} mode="inline" ready={near} template={template} onPickTemplate={onPickTemplate} />
+    </div>
+  );
+}
+
+export function ComoFunciona() {
+  const { active, refs } = useActiveStep(STEPS.length);
+  const desktop = useDesktop();
+  const reduce = useReducedMotion();
+  const stageRef = useRef<HTMLDivElement>(null);
+  const stageSeen = useInView(stageRef, { once: true });
+  const [template, setTemplate] = useState<SceneKey>("ecommerce");
+  const [manual, setManual] = useState(false);
+
+  const pick = useCallback((k: SceneKey) => {
+    setManual(true);
+    setTemplate(k);
   }, []);
+  const next = useCallback(() => setTemplate((t) => (t === "ecommerce" ? "imob" : "ecommerce")), []);
+  // ao sair do passo 2 e voltar, segue do template em que parou (o estado mora aqui).
+  // Só no desktop: no celular o painel tem altura natural e a troca empurraria o texto de baixo.
+  useAutoTemplate(!manual && !reduce && desktop && stageSeen && active === 1, next);
 
   return (
     <section id="como-funciona" aria-labelledby="cf-title" className="relative bg-card">
@@ -50,7 +137,7 @@ export function ComoFunciona() {
           <PromptHeadline id="cf-title" />
         </div>
 
-        <div className="mt-16 lg:mt-24 lg:grid lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16">
+        <div className="mt-16 lg:mt-24 lg:grid lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-14">
           <ol className="space-y-14 lg:space-y-0">
             {STEPS.map((s, i) => (
               <li
@@ -59,12 +146,10 @@ export function ComoFunciona() {
                   refs.current[i] = el;
                 }}
                 data-step={i}
-                className="lg:flex lg:min-h-[72vh] lg:flex-col lg:justify-center"
+                className="lg:flex lg:min-h-[85vh] lg:flex-col lg:justify-center"
               >
                 <p
-                  className={`display text-[4.5rem] tnum transition-colors duration-300 lg:text-[7rem] ${
-                    active === i ? "text-accent" : "text-fg-2/40 max-lg:text-accent"
-                  }`}
+                  className={`display text-[4.5rem] tnum transition-colors duration-300 lg:text-[7rem] ${active === i ? "text-accent" : "text-fg-2/40 max-lg:text-accent"}`}
                   aria-hidden
                 >
                   0{i + 1}
@@ -74,15 +159,14 @@ export function ComoFunciona() {
                   {s.title}
                 </h3>
                 <p className="mt-3 max-w-md text-[17px] leading-relaxed text-fg-2">{s.text}</p>
-                <div className={`mt-6 lg:hidden ${i === 1 ? "h-[460px] sm:h-[520px]" : "h-[300px] sm:h-[360px]"}`}>
-                  <StoryPanel step={i} />
-                </div>
+                <InlineStage step={i} template={template} onPickTemplate={pick} />
               </li>
             ))}
           </ol>
           <div className="hidden lg:block">
-            <div className="sticky top-[14vh] h-[72vh]">
-              <StoryPanel step={active} />
+            {/* o contêiner sticky é fixo: só o conteúdo do passo troca */}
+            <div ref={stageRef} className="sticky top-[calc(50vh-min(39vh,360px))] h-[min(78vh,720px)]">
+              <StoryStage step={active} mode="sticky" ready={stageSeen} template={template} onPickTemplate={pick} />
             </div>
           </div>
         </div>
