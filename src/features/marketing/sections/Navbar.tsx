@@ -2,6 +2,7 @@
 
 import { Menu, X } from "lucide-react";
 import { AnimatePresence, m, useMotionValueEvent, useReducedMotion, useScroll } from "motion/react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { scrollToId, stopScroll } from "@/components/motion/SmoothScroll";
@@ -100,6 +101,9 @@ export function Navbar() {
 
           <div className="flex items-center gap-2">
             <span className="hidden lg:contents">
+              <Link href="/entrar" className="inline-flex h-9 items-center rounded-control px-3 text-sm font-medium text-fg-2 transition-colors duration-200 hover:text-fg">
+                Entrar
+              </Link>
               <a href={waLink(MSG_SPECIALIST)} target="_blank" rel="noopener noreferrer" className={btn.small}>
                 <WhatsAppIcon size={16} />
                 Falar com especialista
@@ -178,7 +182,10 @@ export function Navbar() {
                 </m.li>
               ))}
             </ul>
-            <div className="mt-auto flex items-center gap-3">
+            <Link href="/entrar" onClick={() => setOpen(false)} className={`${btn.secondary} mt-auto mb-3 w-full`}>
+              Entrar
+            </Link>
+            <div className="flex items-center gap-3">
               <a href={waLink(MSG_SPECIALIST)} target="_blank" rel="noopener noreferrer" className={`${btn.primary} flex-1`}>
                 <WhatsAppIcon /> Falar com especialista
               </a>

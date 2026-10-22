@@ -1,11 +1,12 @@
 "use client";
 
-import { BarChart3, Gem, Home, Menu, PanelsTopLeft, Plug, Settings, Share2 } from "lucide-react";
+import { BarChart3, ChevronsUpDown, Gem, Home, LogOut, Menu, PanelsTopLeft, Plug, Settings, Share2 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useState, type ReactNode } from "react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Modal, PendingChip } from "@/components/ui/kit";
+import { Menu as DropMenu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/Menu";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { TIER_LABEL, TIERS, type Tier } from "@/features/pricing/entitlements";
 import { useWorkspace } from "./workspace";
@@ -111,8 +112,47 @@ export function PlanSimulator({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+/** Cartão do workspace com o próprio menu (Configurações e Sair). */
+function WorkspaceMenu() {
   const { ws } = useWorkspace();
+  const router = useRouter();
+  return (
+    <DropMenu>
+      <MenuTrigger className="mt-auto flex w-full items-center gap-2 rounded-card border border-line bg-bg p-3 text-left outline-none hover:border-accent focus-visible:border-accent data-[state=open]:border-accent">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13.5px] font-semibold">{ws.name}</span>
+          <span className="block text-[12px] text-fg-2">
+            {TIER_LABEL[ws.tier]} · {ws.contractedAccounts} {ws.contractedAccounts === 1 ? "conta" : "contas"}
+          </span>
+        </span>
+        <ChevronsUpDown size={15} aria-hidden className="shrink-0 text-fg-2" />
+      </MenuTrigger>
+      <MenuContent side="top" align="start" className="w-[var(--radix-dropdown-menu-trigger-width)]">
+        <MenuItem icon={<Settings size={15} />} onSelect={() => router.push("/painel/configuracoes")}>
+          Configurações
+        </MenuItem>
+        <MenuSeparator />
+        <MenuItem icon={<LogOut size={15} />} onSelect={() => router.push("/entrar")}>
+          Sair
+        </MenuItem>
+      </MenuContent>
+    </DropMenu>
+  );
+}
+
+/** Lembra que o painel é uma demonstração: nada sai deste navegador. */
+function DemoChip() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-chip bg-accent-soft px-2.5 py-1 text-[12px] font-medium whitespace-nowrap text-fg">
+      <span className="size-1.5 rounded-full bg-accent" aria-hidden />
+      <span>
+        Modo demonstração<span className="max-md:hidden"> · dados neste navegador</span>
+      </span>
+    </span>
+  );
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
   const [more, setMore] = useState(false);
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr] print:block">
@@ -125,12 +165,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <ActiveSideNav />
           </Suspense>
         </nav>
-        <div className="mt-auto rounded-card border border-line bg-bg p-3">
-          <p className="truncate text-[13.5px] font-semibold">{ws.name}</p>
-          <p className="text-[12px] text-fg-2">
-            {TIER_LABEL[ws.tier]} · {ws.contractedAccounts} {ws.contractedAccounts === 1 ? "conta" : "contas"}
-          </p>
-        </div>
+        <WorkspaceMenu />
       </aside>
 
       <div className="min-w-0">
@@ -139,10 +174,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link href="/painel" aria-label="VYZ, início do painel" className="block w-14 lg:hidden">
               <Wordmark decorative />
             </Link>
-            <div className="hidden sm:block">
+            <div className="hidden items-center gap-3 sm:flex">
+              <DemoChip />
               <PlanSimulator />
             </div>
             <div className="flex items-center gap-2">
+              <div className="sm:hidden">
+                <DemoChip />
+              </div>
               <div className="sm:hidden">
                 <PlanSimulator compact />
               </div>
@@ -172,6 +211,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <li>
             <Link href="/" className="flex items-center gap-3 rounded-control px-3 py-3 text-[15px] text-fg-2 hover:bg-accent-soft">
               Voltar ao site
+            </Link>
+          </li>
+          <li>
+            <Link href="/entrar" className="flex items-center gap-3 rounded-control px-3 py-3 text-[15px] text-fg-2 hover:bg-accent-soft">
+              <LogOut size={18} aria-hidden /> Sair
             </Link>
           </li>
         </ul>

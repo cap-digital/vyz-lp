@@ -6,6 +6,7 @@ O que hoje funciona só no navegador e depende de backend, de integração ou de
 
 | Item | Como está hoje | Aviso no produto |
 |---|---|---|
+| Login real (link mágico + Google) e proteção de `/painel` | Login real (link mágico + Google) e proteção de `/painel` via `proxy.ts` precisam do Supabase. Hoje `/painel` é aberto: `/entrar` só avisa e leva ao painel de demonstração; "Sair" volta para `/entrar` | "Login precisa do Supabase" (`/entrar`) e "Modo demonstração · dados neste navegador" (topo do painel) |
 | Login, workspace e membros da equipe | Workspace único, salvo no navegador | "Precisa conectar Supabase" (topo do painel e Configurações) |
 | Plano real da conta | Seletor "Simular plano" (Base, Pro, Avançado, Personalizado) | "Precisa conectar Supabase · o plano real virá da conta" |
 | Persistência | `LocalStore` (localStorage, `vyz:v1:`). Trocar por `SupabaseStore` com a mesma interface `Store` (`src/lib/store/store.ts`) | — |
