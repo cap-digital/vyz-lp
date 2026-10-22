@@ -25,10 +25,14 @@ export type WidgetContext = {
   zero?: boolean;
   /** Marca a linha da meta para a intro da LP. */
   markGoal?: boolean;
+  /** Comparação com o período anterior (variações nos KPIs). */
+  compare?: boolean;
+  /** Linha tracejada do período anterior nos gráficos de linha. */
+  showPrevious?: boolean;
 };
 
 export function makeContext(ds: Dataset, opts: Partial<WidgetContext> = {}): WidgetContext {
-  return { ds, profile: ds.spec.profile, cur: currentTotals(ds), prev: previousTotals(ds), ...opts };
+  return { ds, profile: ds.spec.profile, cur: currentTotals(ds), prev: previousTotals(ds), compare: true, ...opts };
 }
 
 const HIDDEN = "•••";
@@ -73,7 +77,7 @@ export function Kpi({ spec, ctx, delay }: { spec: KpiSpec; ctx: WidgetContext; d
   let sub: ReactNode = null;
   switch (spec.sub) {
     case "delta":
-      sub = <Delta cur={cur[spec.metric]} prev={prev[spec.metric]} id={spec.metric} profile={profile} suffix=" vs anterior" />;
+      sub = ctx.compare ? <Delta cur={cur[spec.metric]} prev={prev[spec.metric]} id={spec.metric} profile={profile} suffix=" vs anterior" /> : "no período";
       break;
     case "split": {
       const parts = byPlatform(ds).map((p) => `${short(p.id)} ${int(p.conv)}`);
@@ -125,7 +129,7 @@ export function Widget({ spec, ctx, delay }: { spec: WidgetSpec; ctx: WidgetCont
       const summary = `${def.label} diário dos últimos ${values.length} dias, com média móvel de 7 dias em ${formatValue(last, def.format)}${goal ? `, meta de ${brl(goal)}` : ""}. Os últimos 3 dias estão em maturação.`;
       return (
         <Card title={title} delay={delay}>
-          <LineChart values={values} avg={avg} goal={goal} goalLabel={goal ? brl(goal, { decimals: false }) : undefined} maturingDays={3} summary={summary} markGoal={ctx.markGoal} />
+          <LineChart values={values} avg={avg} previous={ctx.showPrevious && ds.previous.length === values.length ? series(ds.previous, spec.metric) : undefined} goal={goal} goalLabel={goal ? brl(goal, { decimals: false }) : undefined} maturingDays={3} summary={summary} markGoal={ctx.markGoal} />
         </Card>
       );
     }

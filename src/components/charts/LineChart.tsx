@@ -66,6 +66,11 @@ export function LineChart({ values, avg, previous, goal, maturingDays = 0, goalL
             <span className="w-3 border-t border-dashed border-fg-2" /> meta
           </span>
         )}
+        {previous && (
+          <span className="inline-flex items-center gap-1">
+            <span className="w-3 border-t border-dotted border-muted" /> período anterior
+          </span>
+        )}
         {maturingDays > 0 && (
           <span className="inline-flex items-center gap-1">
             <span className="size-2 rounded-[2px] bg-accent-soft" /> em maturação

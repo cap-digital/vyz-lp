@@ -1,0 +1,166 @@
+"use client";
+
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { Wordmark } from "@/components/brand/Wordmark";
+import { PendingChip, SelectField, Tabs } from "@/components/ui/kit";
+import { PLATFORMS } from "@/features/accounts/platforms";
+import { onColor } from "@/features/landing-pages/LandingRenderer";
+import { dashboardTemplate } from "@/features/templates/dashboards";
+import { PAGES } from "@/features/templates/pages";
+import type { PageId } from "@/features/templates/types";
+import { ATTRIBUTIONS, periodDays, PERIODS, type DashboardSettings, type PeriodId } from "@/features/workspace/types";
+import type { Brand } from "@/features/workspace/workspace";
+import { ddmmyyyy } from "@/lib/format";
+import { datasetFor, pageLayout } from "./data";
+import { PageView } from "./widgets/PageView";
+import { makeContext } from "./widgets/Widgets";
+
+export type DashboardSpec = { templateId: string; name: string; client: string; pages: PageId[]; settings: DashboardSettings; brand?: Brand };
+
+/** Variáveis de cor da marca própria (Personalizado), iguais nos dois modos. */
+export function brandStyle(brand?: Brand): CSSProperties | undefined {
+  if (!brand?.color) return undefined;
+  return { "--accent": brand.color, "--on-accent": onColor(brand.color) } as CSSProperties;
+}
+
+export function BrandMark({ brand }: { brand?: Brand }) {
+  if (brand?.logo) {
+    // eslint-disable-next-line @next/next/no-img-element -- dataURL local
+    return <img src={brand.logo} alt="Logo" className="h-8 w-auto max-w-[160px] object-contain" />;
+  }
+  if (brand?.hideVyz) return null;
+  return <Wordmark className="w-14 text-accent" />;
+}
+
+type BodyProps = {
+  spec: DashboardSpec;
+  hideSpend?: boolean;
+  /** Montagem com scanner (logo depois de gerar). */
+  assemble?: boolean;
+  /** Ações no topo (painel); vazio no link público. */
+  actions?: ReactNode;
+  /** Renderiza todas as páginas para impressão. */
+  printing?: boolean;
+};
+
+/** Cabeçalho, abas, período e a página ativa. Mesmo miolo no painel e no link público. */
+export function DashboardBody({ spec, hideSpend, assemble, actions, printing }: BodyProps) {
+  const t = dashboardTemplate(spec.templateId);
+  const [page, setPage] = useState<PageId>(spec.pages[0] ?? "visao-geral");
+  const [period, setPeriod] = useState<PeriodId>(spec.settings.period);
+  const [customDays, setCustomDays] = useState(spec.settings.customDays || 14);
+  const [compare, setCompare] = useState(true);
+  const days = periodDays({ period, customDays });
+  const ds = useMemo(() => datasetFor({ ...spec, settings: spec.settings }, days), [spec, days]);
+  if (!t) return <p className="text-fg-2">Template não encontrado.</p>;
+  const ctx = makeContext(ds, { hideSpend, compare, showPrevious: compare });
+  const active = spec.pages.includes(page) ? page : spec.pages[0];
+  const periodLabel = PERIODS.find((p) => p.value === period)?.label ?? "";
+  const attribution = ATTRIBUTIONS.find((a) => a.value === spec.settings.attribution)?.label;
+
+  return (
+    <div style={brandStyle(spec.brand)} className="space-y-4">
+      <header className="flex flex-col gap-4 print:hidden lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="hidden shrink-0 pt-1.5 sm:block">
+            <BrandMark brand={spec.brand} />
+          </div>
+          <div className="min-w-0">
+            <h1 className="title truncate text-[1.6rem]">{spec.name}</h1>
+            <p className="text-[14px] text-fg-2">{spec.client}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {t.sources.map((s) => (
+                <span key={s} className="rounded-chip border border-line px-2 py-0.5 text-[11.5px] text-fg-2">
+                  {PLATFORMS[s].name}
+                </span>
+              ))}
+              <span className="rounded-chip bg-accent-soft px-2 py-0.5 text-[11.5px] font-medium text-fg">Amostra · dados fictícios</span>
+              <PendingChip label="Dados reais precisam de conexão" detail="Quando as contas forem conectadas (OAuth), os mesmos widgets passam a ler os números reais." />
+            </div>
+          </div>
+        </div>
+        {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      </header>
+
+      <div className="flex flex-col gap-3 print:hidden sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <Tabs label="Páginas do dashboard" value={active} onChange={setPage} items={spec.pages.map((p) => ({ value: p, label: PAGES[p].name }))} />
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-44">
+            <SelectField label="Período" value={period} onChange={(v) => setPeriod(v as PeriodId)} options={PERIODS} />
+          </div>
+          {period === "custom" && (
+            <label className="block w-24 text-[13px] font-medium">
+              Dias
+              <input
+                type="number"
+                min={3}
+                max={60}
+                value={customDays}
+                onChange={(e) => setCustomDays(Number(e.target.value) || 14)}
+                className="mt-1 h-10 w-full rounded-control border border-line bg-field px-3 text-[14px] tnum"
+              />
+            </label>
+          )}
+          <label className="flex h-10 items-center gap-2 rounded-control border border-line px-3 text-[13px]">
+            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} className="accent-[var(--accent)]" />
+            Comparar com o período anterior
+          </label>
+        </div>
+      </div>
+
+      <p className="text-[12.5px] text-fg-2 print:hidden">
+        {periodLabel} · {days} dias · janela de atribuição: {attribution}. Os últimos 3 dias ficam em maturação.
+      </p>
+
+      {!printing && (
+        <div className="relative" data-anim={assemble ? "on" : "off"}>
+          <div className="scanner" aria-hidden />
+          <div className="m-unveil">
+            <PageView key={active} layout={pageLayout(t, active)} ctx={ctx} />
+          </div>
+        </div>
+      )}
+
+      {printing && (
+        <div className="print-root">
+          <section className="print-page flex flex-col justify-between">
+            <div>
+              <BrandMark brand={spec.brand} />
+              <h1 className="display mt-16 text-[48px]">{spec.name}</h1>
+              <p className="mt-3 text-[20px] text-fg-2">{spec.client}</p>
+            </div>
+            <dl className="grid grid-cols-3 gap-6 text-[14px]">
+              <div>
+                <dt className="text-fg-2">Período</dt>
+                <dd className="font-semibold">
+                  {periodLabel} ({days} dias)
+                </dd>
+              </div>
+              <div>
+                <dt className="text-fg-2">Gerado em</dt>
+                <dd className="font-semibold tnum">{ddmmyyyy(new Date())}</dd>
+              </div>
+              <div>
+                <dt className="text-fg-2">Dados</dt>
+                <dd className="font-semibold">Amostra · dados fictícios</dd>
+              </div>
+            </dl>
+          </section>
+          {spec.pages.map((p) => (
+            <section key={p} className="print-page">
+              <p className="mb-3 flex items-baseline justify-between text-[13px] text-fg-2">
+                <span className="title text-[18px] text-fg">{PAGES[p].name}</span>
+                <span>
+                  {spec.client} · {periodLabel}
+                </span>
+              </p>
+              <PageView layout={pageLayout(t, p)} ctx={ctx} />
+            </section>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

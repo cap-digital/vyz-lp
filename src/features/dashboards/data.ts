@@ -1,0 +1,36 @@
+import { MockSource, type Dataset } from "@/features/metrics/source";
+import { dashboardTemplate } from "@/features/templates/dashboards";
+import { PAGES } from "@/features/templates/pages";
+import type { DashboardTemplate, PageId, PageLayout } from "@/features/templates/types";
+import type { DashboardSettings } from "@/features/workspace/types";
+
+export const DEFAULT_SETTINGS: DashboardSettings = {
+  goal: 0,
+  margin: 0.4,
+  budget: 0,
+  period: "30d",
+  customDays: 14,
+  attribution: "7c1v",
+  currency: "BRL",
+};
+
+type Spec = { templateId: string; name: string; client: string; settings?: Partial<DashboardSettings> };
+
+/** Dados de amostra de um dashboard: o mesmo nome + cliente + template gera sempre os mesmos números. */
+export function datasetFor(spec: Spec, days: number): Dataset {
+  const t = dashboardTemplate(spec.templateId) as DashboardTemplate;
+  const s = { ...DEFAULT_SETTINGS, ...spec.settings };
+  return MockSource.load({
+    seed: `${spec.name}|${spec.client}|${spec.templateId}`,
+    profile: t.profile,
+    sources: t.sources,
+    days,
+    goal: s.goal || undefined,
+    margin: s.margin || undefined,
+    budget: s.budget || undefined,
+  });
+}
+
+export function pageLayout(t: DashboardTemplate, page: PageId): PageLayout {
+  return PAGES[page].build({ profile: t.profile, sources: t.sources });
+}

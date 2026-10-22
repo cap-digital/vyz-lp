@@ -739,6 +739,63 @@ details.lines summary::-webkit-details-marker {
   animation-delay: var(--d, 300ms);
 }
 
+
+/* ---- Impressão (PDF do dashboard) ----------------------------------- */
+/* A4 paisagem, uma página do dashboard por folha, sempre nas cores do modo claro. */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+  :root,
+  [data-theme="dark"] {
+    color-scheme: light;
+    --bg: #ffffff;
+    --card: #f3f5ee;
+    --fg: #1e1e1e;
+    --fg-2: #5f625a;
+    --line: #cfd3c6;
+    --accent: #4b5320;
+    --accent-soft: #d7dcc3;
+    --on-accent: #e8ece1;
+    --field: #ffffff;
+    --muted: #b9bdb0;
+    --error-soft: #f3d9d2;
+    --error-fg: #a3341f;
+    --seq-a: #4b5320;
+    --seq-b: #6e7c3a;
+    --seq-c: #8a9a5b;
+    --seq-d: #b9c48f;
+  }
+  html,
+  body {
+    background: #ffffff !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .scanner,
+  dialog {
+    display: none !important;
+  }
+  .print-page {
+    break-after: page;
+    min-height: 180mm;
+    padding-top: 2mm;
+  }
+  .print-page:last-child {
+    break-after: auto;
+  }
+  .print-page > * {
+    break-inside: avoid;
+  }
+}
+
 /* ---- Movimento reduzido: tudo aparece direto -------------------------- */
 @media (prefers-reduced-motion: reduce) {
   *,
