@@ -2,6 +2,8 @@
 
 /* Modo escuro: segue data-theme no <html>. O padrão é o escuro. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* Sidebar do painel recolhida: atributo no <html>, aplicado antes da primeira pintura. */
+@custom-variant sb-closed (&:where([data-sidebar="closed"] *));
 
 /* Tokens de interface · Brand Showcase 2026, página 5 */
 :root {
@@ -20,6 +22,11 @@
   --error-soft: #f3d9d2;
   --error-fg: #a3341f;
   --nav-bg: rgb(232 236 225 / 0.72);
+  /* painel: moldura na cor da sidebar, conteúdo num painel arredondado */
+  --sidebar: #4b5320;
+  --sidebar-fg: #e8ece1;
+  --sidebar-muted: rgb(232 236 225 / 0.7);
+  --panel: #e8ece1;
   /* funil: verdes da escala sequencial, do mais forte ao mais leve */
   --seq-a: #4b5320;
   --seq-b: #6e7c3a;
@@ -46,6 +53,10 @@
   --error-soft: #3b2420;
   --error-fg: #f0a593;
   --nav-bg: rgb(30 30 30 / 0.72);
+  --sidebar: #2f3621;
+  --sidebar-fg: #e8ece1;
+  --sidebar-muted: #a3a69c;
+  --panel: #1e1e1e;
   --seq-a: #8a9a5b;
   --seq-b: #6e7c3a;
   --seq-c: #4b5320;
@@ -794,6 +805,25 @@ details.lines summary::-webkit-details-marker {
   .print-page > * {
     break-inside: avoid;
   }
+}
+
+/* ---- Sidebar do painel: aba ativa com cantos côncavos ------------------- */
+.side-tab::before,
+.side-tab::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+}
+.side-tab::before {
+  top: -20px;
+  background: radial-gradient(circle at 0 0, transparent 20px, var(--panel) 20.5px);
+}
+.side-tab::after {
+  bottom: -20px;
+  background: radial-gradient(circle at 0 100%, transparent 20px, var(--panel) 20.5px);
 }
 
 /* ---- Popovers (Select, menu, calendário, tooltip): 150 ms, 4 px de entrada -- */

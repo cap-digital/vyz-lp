@@ -11,7 +11,7 @@ Um repositório Next.js 16 (App Router, `src/`, Tailwind v4, Cache Components) c
    - `features/metrics`: definições de métrica (rótulo, formato, se "maior é melhor") e as regras de cálculo (venda deduplicada, CTR ponderado, dias em maturação), mais a `DataSource`.
    - `components/charts`: gráficos em SVG feitos à mão, sem biblioteca.
 3. **O mock é o produto.** O gerador do hero, o passo 2 de "Como funciona", a galeria, o painel e o link público renderizam os mesmos widgets (`features/dashboards/widgets`). Só muda a fonte de dados.
-4. **Persistência atrás de uma interface.** `lib/store` define `Store`. Hoje existe só `LocalStore` (localStorage, prefixo `vyz:v1:`, tudo em try/catch); depois entra um `SupabaseStore` com a mesma interface. Nenhum componente acessa `localStorage` direto (a única exceção é a preferência de tema, em `components/ui/ThemeToggle`, e a sessão da intro, que são do navegador e não do produto).
+4. **Persistência atrás de uma interface.** `lib/store` define `Store`. Hoje existe só `LocalStore` (localStorage, prefixo `vyz:v1:`, tudo em try/catch); depois entra um `SupabaseStore` com a mesma interface. Nenhum componente acessa `localStorage` direto (a única exceção é a preferência de tema, em `components/ui/ThemeToggle`, e a sessão da intro e o estado da sidebar do painel, que são do navegador e não do produto).
 5. **Dados de anúncio vêm de uma `DataSource`.** Hoje `MockSource` (determinística, com seed por dashboard); depois `DbSource`, alimentada pelas conexões OAuth.
 
 ## Rotas
@@ -20,7 +20,8 @@ Um repositório Next.js 16 (App Router, `src/`, Tailwind v4, Cache Components) c
 src/app/
   layout.tsx                          raiz mínima: Inter, tokens, script de tema
   (marketing)/layout.tsx + page.tsx   LP em /, com Lenis, intro e motion
-  (painel)/painel/layout.tsx          app shell (sidebar das págs. 14/15 do brand book)
+  (auth)/entrar/page.tsx              entrar (pág. 17 do brand book); sem backend, só avisa
+  (painel)/painel/layout.tsx          app shell: sidebar em aba (recolhível com "["), conteúdo num painel
     page.tsx                          Início
     dashboards/page.tsx               meus dashboards
     dashboards/novo/page.tsx          galeria + fluxo guiado (5 passos)
@@ -44,7 +45,10 @@ As rotas com `[id]` não têm `generateStaticParams` (os ids nascem no navegador
 src/
   components/
     brand/      Wordmark, Icon, geometria do logo
-    ui/         botões, Segmented, Stepper, Toast, ThemeToggle, Odometer, PendingChip, Modal, campos
+    ui/         botões, Segmented, Stepper, Toast, ThemeToggle, Odometer, PendingChip, Modal, campos e
+                controles próprios (nada nativo): Select, Menu, Tooltip (Radix), Checkbox/Radio/Switch,
+                NumberStepper, PeriodPicker, FileInput, ColorField. Dentro de Modal, os popovers montam
+                no próprio <dialog> (portal.ts)
     charts/     LineChart, Funnel, Scatter, BarList, Bars, ProgressBar
     motion/     só para (marketing): CutReveal, Reveal, Magnetic, SmoothScroll, ScrollProgress, SectionWipe, MotionRoot
   features/

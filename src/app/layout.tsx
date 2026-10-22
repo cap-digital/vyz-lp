@@ -24,8 +24,9 @@ export const viewport: Viewport = {
 };
 
 // Roda antes da primeira pintura: tema salvo (o padrão é o escuro), marca que
-// há JS e decide se a intro da sessão roda (só na LP, em /).
-const bootScript = `(function(){var d=document.documentElement;d.setAttribute("data-js","");try{var t=localStorage.getItem("vyz-theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t)}catch(e){}try{if(location.pathname==="/"&&!sessionStorage.getItem("vyz-intro")&&!location.hash&&!matchMedia("(prefers-reduced-motion: reduce)").matches)d.setAttribute("data-intro","")}catch(e){}})()`;
+// há JS, estado da sidebar do painel (recolhida abaixo de 1280 px, se nada
+// salvo) e decide se a intro da sessão roda (só na LP, em /).
+const bootScript = `(function(){var d=document.documentElement;d.setAttribute("data-js","");try{var t=localStorage.getItem("vyz-theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t)}catch(e){}try{if(location.pathname.indexOf("/painel")===0){var b=localStorage.getItem("vyz:sidebar");d.setAttribute("data-sidebar",b==="open"||b==="closed"?b:innerWidth<1280?"closed":"open")}}catch(e){}try{if(location.pathname==="/"&&!sessionStorage.getItem("vyz-intro")&&!location.hash&&!matchMedia("(prefers-reduced-motion: reduce)").matches)d.setAttribute("data-intro","")}catch(e){}})()`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
