@@ -1,0 +1,94 @@
+"use client";
+
+import { motion } from "motion/react";
+import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+
+export type SegmentOption<T extends string> = {
+  value: T;
+  label: ReactNode;
+  badge?: ReactNode;
+  disabled?: boolean;
+};
+
+type SegmentedProps<T extends string> = {
+  options: SegmentOption<T>[];
+  value: T | null;
+  onChange: (v: T) => void;
+  label: string;
+  /** "track" = trilho com pílula; "chips" = chips soltos com a pílula deslizando entre eles. */
+  variant?: "track" | "chips";
+  size?: "sm" | "md";
+  className?: string;
+  /** Pílula ocupando a largura toda, com opções de largura igual. */
+  block?: boolean;
+};
+
+/** Grupo de opções exclusivas (radiogroup) com pílula deslizante. */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+  variant = "track",
+  size = "md",
+  className = "",
+  block = false,
+}: SegmentedProps<T>) {
+  const pillId = useId();
+  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const enabled = options.filter((o) => !o.disabled);
+
+  function onKey(e: KeyboardEvent, i: number) {
+    const dir = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    const current = enabled.findIndex((o) => o.value === options[i].value);
+    const next = enabled[(current + dir + enabled.length) % enabled.length];
+    onChange(next.value);
+    refs.current[options.indexOf(next)]?.focus();
+  }
+
+  const h = size === "sm" ? "h-8 px-3 text-[13px]" : "h-10 px-4 text-sm";
+  const track = variant === "track" ? "rounded-chip border border-line bg-bg p-1" : "flex-wrap gap-2";
+  const focusIndex = Math.max(
+    0,
+    options.findIndex((o) => o.value === value),
+  );
+
+  return (
+    <div role="radiogroup" aria-label={label} className={`relative ${block ? "flex" : "inline-flex"} ${track} ${className}`}>
+      {options.map((o, i) => {
+        const checked = o.value === value;
+        return (
+          <button
+            key={o.value}
+            ref={(el) => {
+              refs.current[i] = el;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={checked}
+            disabled={o.disabled}
+            tabIndex={i === focusIndex ? 0 : -1}
+            onClick={() => onChange(o.value)}
+            onKeyDown={(e) => onKey(e, i)}
+            className={`relative isolate inline-flex items-center justify-center gap-1.5 rounded-chip font-medium transition-colors duration-200 ${h} ${block ? "flex-1" : ""} ${
+              variant === "chips" && !checked ? "border border-line" : variant === "chips" ? "border border-transparent" : ""
+            } ${checked ? "text-on-accent" : "text-fg-2 hover:text-fg"} disabled:opacity-40`}
+          >
+            {checked && (
+              <motion.span
+                layoutId={pillId}
+                aria-hidden
+                className="absolute inset-0 -z-10 rounded-chip bg-accent"
+                transition={{ type: "spring", stiffness: 520, damping: 40 }}
+              />
+            )}
+            {o.label}
+            {o.badge}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
