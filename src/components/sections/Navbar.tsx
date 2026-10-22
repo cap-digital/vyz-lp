@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu, X } from "lucide-react";
-import { AnimatePresence, motion, useMotionValueEvent, useReducedMotion, useScroll } from "motion/react";
+import { AnimatePresence, m, useMotionValueEvent, useReducedMotion, useScroll } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { scrollToId, stopScroll } from "@/components/motion/SmoothScroll";
@@ -24,6 +24,14 @@ export function Navbar() {
   const reduce = useReducedMotion();
   const menuRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const [marker, setMarker] = useState<{ x: number; w: number } | null>(null);
+
+  useEffect(() => {
+    const link = active ? listRef.current?.querySelector<HTMLElement>(`[data-link="${active}"]`) : null;
+    if (!link) return setMarker(null);
+    setMarker({ x: link.offsetLeft, w: link.offsetWidth });
+  }, [active]);
 
   useMotionValueEvent(scrollY, "change", (y) => setScrolled(y > 8));
 
@@ -69,49 +77,45 @@ export function Navbar() {
             <Wordmark decorative />
           </a>
 
-          <ul className="hidden items-center gap-8 lg:flex">
+          <ul ref={listRef} className="relative hidden items-center gap-8 lg:flex">
             {LINKS.map((l) => (
-              <li key={l.id} className="relative">
+              <li key={l.id}>
                 <a
                   href={`#${l.id}`}
+                  data-link={l.id}
                   aria-current={active === l.id ? "location" : undefined}
                   className={`block py-2 text-sm font-medium transition-colors duration-200 hover:text-fg ${active === l.id ? "text-fg" : "text-fg-2"}`}
                 >
                   {l.label}
                 </a>
-                {active === l.id && (
-                  <motion.span
-                    layoutId="nav-cut"
-                    aria-hidden
-                    className="absolute inset-x-0 -bottom-0.5 h-[var(--cut)] bg-accent"
-                    transition={{ type: "spring", stiffness: 420, damping: 36 }}
-                  />
-                )}
               </li>
             ))}
+            {/* traço do link ativo, na espessura do corte; desliza só com transform */}
+            <span
+              aria-hidden
+              className="absolute -bottom-0.5 left-0 h-[var(--cut)] w-px origin-left bg-accent transition-[transform,opacity] duration-300 ease-brand"
+              style={{ opacity: marker ? 1 : 0, transform: marker ? `translateX(${marker.x}px) scaleX(${marker.w})` : undefined }}
+            />
           </ul>
 
           <div className="flex items-center gap-2">
-            <a
-              href={waLink(MSG_SPECIALIST)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`${btn.small} hidden sm:inline-flex`}
-            >
-              <WhatsAppIcon size={16} />
-              Falar com especialista
-            </a>
-            <ThemeToggle className="hidden lg:inline-flex" />
+            <span className="hidden lg:contents">
+              <a href={waLink(MSG_SPECIALIST)} target="_blank" rel="noopener noreferrer" className={btn.small}>
+                <WhatsAppIcon size={16} />
+                Falar com especialista
+              </a>
+              <ThemeToggle />
+            </span>
             <button
               ref={toggleRef}
               type="button"
               aria-expanded={open}
               aria-controls="menu-celular"
-              aria-label={open ? "Fechar menu" : "Abrir menu"}
+              aria-label="Abrir menu"
               onClick={() => setOpen((o) => !o)}
-              className="relative z-[66] inline-flex size-10 items-center justify-center rounded-control border border-line text-fg lg:hidden"
+              className="inline-flex size-10 items-center justify-center rounded-control border border-line text-fg lg:hidden"
             >
-              {open ? <X size={20} aria-hidden /> : <Menu size={20} aria-hidden />}
+              <Menu size={20} aria-hidden />
             </button>
           </div>
         </nav>
@@ -119,20 +123,20 @@ export function Navbar() {
 
       <AnimatePresence>
         {open && (
-          <motion.div
+          <m.div
             ref={menuRef}
             id="menu-celular"
             role="dialog"
             aria-modal="true"
             aria-label="Menu"
-            className="fixed inset-0 z-[65] flex flex-col bg-bg px-4 pt-24 pb-8 sm:px-6"
+            className="fixed inset-0 z-[65] flex flex-col bg-bg px-4 pb-8 sm:px-6"
             initial={reduce ? { opacity: 0 } : { clipPath: "inset(50% 0 50% 0)" }}
             animate={reduce ? { opacity: 1 } : { clipPath: "inset(0% 0 0% 0)" }}
             exit={reduce ? { opacity: 0 } : { clipPath: "inset(50% 0 50% 0)" }}
             transition={{ duration: reduce ? 0.15 : 0.55, ease: [0.22, 1, 0.36, 1] }}
           >
             {!reduce && (
-              <motion.span
+              <m.span
                 aria-hidden
                 className="pointer-events-none absolute inset-x-0 top-1/2 h-[var(--cut)] origin-center bg-accent"
                 initial={{ scaleX: 0, opacity: 1 }}
@@ -140,9 +144,22 @@ export function Navbar() {
                 transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
               />
             )}
-            <ul className="space-y-1">
+            <div className="flex h-16 items-center justify-between">
+              <span className="block w-[72px]">
+                <Wordmark decorative />
+              </span>
+              <button
+                type="button"
+                aria-label="Fechar menu"
+                onClick={() => setOpen(false)}
+                className="inline-flex size-10 items-center justify-center rounded-control border border-line text-fg"
+              >
+                <X size={20} aria-hidden />
+              </button>
+            </div>
+            <ul className="mt-8 space-y-1">
               {LINKS.map((l, i) => (
-                <motion.li
+                <m.li
                   key={l.id}
                   initial={reduce ? false : { opacity: 0, y: 18 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -158,7 +175,7 @@ export function Navbar() {
                     className="display block py-2 text-[2.6rem] text-fg">
                     {l.label}
                   </a>
-                </motion.li>
+                </m.li>
               ))}
             </ul>
             <div className="mt-auto flex items-center gap-3">
@@ -167,7 +184,7 @@ export function Navbar() {
               </a>
               <ThemeToggle className="size-12" />
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </header>

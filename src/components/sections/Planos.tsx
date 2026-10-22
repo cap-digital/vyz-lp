@@ -76,12 +76,12 @@ function PlanCard({ id, name, pitch, features, footer, cta, featured, badge, top
   }
 
   return (
-    <Reveal delay={delay} className={`h-full ${className}`}>
+    <Reveal delay={delay} className={`${featured ? "" : "lg:my-8"} ${className}`}>
       <article
         aria-labelledby={`plano-${id}`}
         onPointerMove={spotlight}
         className={`group relative flex h-full flex-col overflow-hidden rounded-card border p-6 transition-colors duration-300 sm:p-7 ${
-          featured ? "border-accent bg-accent text-on-accent lg:py-10" : "border-line bg-card text-fg hover:border-accent"
+          featured ? "border-accent bg-accent text-on-accent lg:py-12" : "border-line bg-card text-fg hover:border-accent"
         }`}
       >
         {/* brilho que segue o cursor (sem sombra) */}
@@ -100,17 +100,17 @@ function PlanCard({ id, name, pitch, features, footer, cta, featured, badge, top
             </h3>
             {badge}
           </div>
-          <p className={`mt-2 text-[15px] leading-relaxed ${featured ? "opacity-80" : "text-fg-2"}`}>{pitch}</p>
+          <p className={`mt-2 text-[15px] leading-relaxed ${featured ? "" : "text-fg-2"}`}>{pitch}</p>
 
           <div className="mt-6">
-            <p className={`label-caps ${featured ? "opacity-75" : "text-fg-2"}`}>a partir de</p>
+            <p className={`label-caps ${featured ? "" : "text-fg-2"}`}>a partir de</p>
             <p className="mt-1 flex items-baseline gap-1">
               <span className="text-[2.6rem] leading-none font-extrabold tracking-[-0.03em]">
                 <Odometer value={brl(price)} />
               </span>
-              <span className={`text-sm ${featured ? "opacity-75" : "text-fg-2"}`}>/mês</span>
+              <span className={`text-sm ${featured ? "" : "text-fg-2"}`}>/mês</span>
             </p>
-            <p className={`mt-1.5 text-[13px] ${featured ? "opacity-75" : "text-fg-2"}`}>
+            <p className={`mt-1.5 text-[13px] ${featured ? "" : "text-fg-2"}`}>
               {state.periodo === "anual" ? "no anual" : "no mensal"} · 1 conta conectada
             </p>
           </div>
@@ -126,7 +126,7 @@ function PlanCard({ id, name, pitch, features, footer, cta, featured, badge, top
 
           {extra}
 
-          <p className={`mt-6 border-t pt-4 text-[13px] leading-relaxed ${featured ? "border-current/20 opacity-80" : "border-line text-fg-2"}`}>{footer}</p>
+          <p className={`mt-6 border-t pt-4 text-[13px] leading-relaxed ${featured ? "border-current/20" : "border-line text-fg-2"}`}>{footer}</p>
 
           <button
             type="button"
@@ -134,7 +134,7 @@ function PlanCard({ id, name, pitch, features, footer, cta, featured, badge, top
               update({ plano: id });
               scrollToId("monte-seu-plano");
             }}
-            className={`${featured ? "bg-on-accent text-accent hover:opacity-90" : "bg-accent text-on-accent hover:opacity-90"} mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-control font-semibold transition-[opacity,transform] duration-200 active:scale-[0.98]`}
+            className={`${featured ? "bg-on-accent text-accent hover:opacity-90" : "bg-accent text-on-accent hover:opacity-90"} mt-5 inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-control font-semibold transition-[opacity,transform] duration-200 active:scale-[0.98]`}
           >
             {cta}
             <ArrowRight size={17} aria-hidden />
@@ -165,6 +165,7 @@ export function Planos() {
             />
           </div>
           <Segmented
+            className="self-start lg:self-end"
             label="Período de cobrança"
             value={state.periodo}
             onChange={(periodo) => update({ periodo })}
@@ -179,7 +180,7 @@ export function Planos() {
           />
         </div>
 
-        <div className="mt-12 grid items-stretch gap-4 lg:grid-cols-[1fr_1.12fr_1fr] lg:items-center">
+        <div className="mt-12 grid items-stretch gap-4 lg:mt-14 lg:grid-cols-[1fr_1.12fr_1fr]">
           <PlanCard
             id="base"
             name="Base"
@@ -199,7 +200,6 @@ export function Planos() {
             name="Pro"
             featured
             delay={110}
-            className="lg:order-none"
             badge={<span className="rounded-chip bg-on-accent px-2.5 py-0.5 text-[12px] font-semibold text-accent">Recomendado</span>}
             pitch="Tudo do Base em 27 plataformas, com tracking conectado pelo nosso time."
             features={[
@@ -232,7 +232,7 @@ export function Planos() {
           />
         </div>
 
-        <div className="mt-8 flex flex-col gap-3 text-sm text-fg-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-8 flex flex-col gap-3 text-sm text-fg-2 sm:flex-row sm:items-center sm:justify-between lg:mt-14">
           <p>Valores em reais · o desconto do anual vale para o plano, não para os extras</p>
           <a href={waLink(MSG_OVER_30)} target="_blank" rel="noopener noreferrer" className={`${btn.ghost} -ml-3 w-fit sm:ml-0`}>
             Mais de 30 contas? Fale com um especialista →

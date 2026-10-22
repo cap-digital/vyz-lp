@@ -1,7 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, m } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
 
 /** Aviso curto no rodapé da tela (aria-live). */
@@ -18,7 +18,7 @@ export function useToast() {
     <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-24 z-[80] flex justify-center px-4 lg:bottom-8">
       <AnimatePresence>
         {msg && (
-          <motion.p
+          <m.p
             key={msg.id}
             initial={{ opacity: 0, y: 16, clipPath: "inset(50% 0 50% 0 round 999px)" }}
             animate={{ opacity: 1, y: 0, clipPath: "inset(0% 0 0% 0 round 999px)" }}
@@ -28,7 +28,7 @@ export function useToast() {
           >
             <Check size={16} aria-hidden />
             {msg.text}
-          </motion.p>
+          </m.p>
         )}
       </AnimatePresence>
     </div>

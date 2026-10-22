@@ -88,7 +88,10 @@ export function ComoFunciona() {
         </div>
 
         <div className="mt-24 lg:mt-28">
-          <CutReveal as="h3" className="display text-[clamp(2rem,4.6vw,3.6rem)] text-fg" lines={["Por que o número fecha."]} />
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <CutReveal as="h3" className="display text-[clamp(2rem,4.6vw,3.6rem)] text-fg" lines={["Por que o número fecha."]} />
+            <p className="rounded-chip border border-line px-2.5 py-0.5 text-[12px] text-fg-2">Amostra · dados fictícios</p>
+          </div>
           <div className="mt-8">
             <WhyCards />
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight } from "lucide-react";
-import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
+import { AnimatePresence, m, useInView, useReducedMotion } from "motion/react";
 import { useRef, type ReactNode } from "react";
 import { CutReveal } from "@/components/motion/CutReveal";
 import { Odometer } from "@/components/motion/Odometer";
@@ -129,12 +129,13 @@ export function MonteSeuPlano() {
 
             <AnimatePresence initial={false}>
               {!noPlan && (
-                <motion.div
+                <m.div
                   key="contas"
-                  initial={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
-                  animate={reduce ? { opacity: 1 } : { height: "auto", opacity: 1 }}
-                  exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
-                  transition={{ duration: reduce ? 0.15 : 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  // mesmas props no servidor e no cliente; com movimento reduzido, só a duração muda
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: reduce ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] }}
                   className="overflow-hidden"
                 >
                   <Step
@@ -195,7 +196,7 @@ export function MonteSeuPlano() {
                       <AccountTicks accepted={q.accountsAccepted} />
                     </div>
                   </Step>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
 
@@ -247,7 +248,7 @@ export function MonteSeuPlano() {
             <Reveal>
               <div className="mt-8 rounded-card bg-accent p-6 text-on-accent sm:p-8">
                 <h3 className="display text-[clamp(2rem,4vw,2.8rem)]">Precisa de mais?</h3>
-                <p className="mt-3 max-w-lg text-[16px] leading-relaxed opacity-85">
+                <p className="mt-3 max-w-lg text-[16px] leading-relaxed">
                   Site institucional, bot de WhatsApp, tracking avulso, mais de 30 contas ou uma plataforma fora da lista. A gente monta com
                   você.
                 </p>
@@ -272,7 +273,7 @@ export function MonteSeuPlano() {
       {/* celular: barra fixa com o total */}
       <AnimatePresence>
         {inSection && !comandaVisible && (
-          <motion.div
+          <m.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
@@ -290,7 +291,7 @@ export function MonteSeuPlano() {
                 Ver conta
               </button>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
       {toast.node}

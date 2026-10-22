@@ -13,9 +13,9 @@ export function Hero() {
       <div className="mx-auto grid max-w-[1360px] gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.02fr)] lg:gap-12 lg:px-10">
         <div className="flex min-w-0 flex-col justify-center">
           <Reveal trigger="intro">
-            <p className="inline-flex max-w-full items-center gap-2 rounded-chip border border-line bg-bg/70 px-3 py-1.5 text-[13px] font-medium text-fg-2">
+            <p className="inline-flex max-w-full items-center gap-2 rounded-chip border border-line bg-bg/70 px-3 py-1.5 text-[13px] leading-snug font-medium text-fg-2">
               <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
-              <span className="truncate">Para gestores de tráfego · Dashboards e landing pages</span>
+              <span>Para gestores de tráfego · Dashboards e landing pages</span>
             </p>
           </Reveal>
 

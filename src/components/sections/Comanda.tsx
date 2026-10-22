@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Copy, Link2 } from "lucide-react";
-import { AnimatePresence, motion, useAnimate, useReducedMotion } from "motion/react";
+import { AnimatePresence, m, useAnimate, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Magnetic } from "@/components/motion/Magnetic";
@@ -40,8 +40,7 @@ async function copyText(text: string) {
 function PrintRow({ children, className = "" }: { children: ReactNode; className?: string }) {
   const reduce = useReducedMotion();
   return (
-    <motion.div
-      layout={!reduce}
+    <m.div
       initial={reduce ? false : { opacity: 0, y: -10, height: 0 }}
       animate={{ opacity: 1, y: 0, height: "auto" }}
       exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0, y: -4 }}
@@ -49,7 +48,7 @@ function PrintRow({ children, className = "" }: { children: ReactNode; className
       className={`overflow-hidden ${className}`}
     >
       {children}
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -117,7 +116,7 @@ export function Comanda({ ref }: { ref?: Ref<HTMLElement> }) {
             {over ? (
               <>
                 <p className="display text-[2.6rem] text-fg">Sob consulta</p>
-                <span className="stamp absolute top-0 right-0 rotate-[-10deg] rounded-control border border-error px-2.5 py-1 text-[13px] font-bold tracking-[0.12em] text-error uppercase">
+                <span className="stamp absolute top-0 right-0 rotate-[-10deg] rounded-control border border-current px-2.5 py-1 text-[13px] font-bold tracking-[0.12em] text-error-fg uppercase">
                   Personalizado
                 </span>
               </>
@@ -146,10 +145,10 @@ export function Comanda({ ref }: { ref?: Ref<HTMLElement> }) {
           )}
         </div>
 
-        {!over && (
+        {!over && !noPlan && (
           <div className="dotted mt-4 pt-1">
             <AnimatePresence initial={false}>
-              {!noPlan && q.oneTime > 0 && (
+              {q.oneTime > 0 && (
                 <PrintRow key="once">
                   <Row label="Uma vez" value={brl(q.oneTime)} />
                 </PrintRow>
@@ -241,7 +240,7 @@ function CopyButton({ done, icon, label, onClick }: { done: boolean; icon: React
         {done ? "Copiado" : ""}
       </span>
       <AnimatePresence mode="wait" initial={false}>
-        <motion.span
+        <m.span
           key={done ? "ok" : "idle"}
           initial={{ y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -252,7 +251,7 @@ function CopyButton({ done, icon, label, onClick }: { done: boolean; icon: React
         >
           {done ? <Check size={16} /> : icon}
           {done ? "Copiado" : label}
-        </motion.span>
+        </m.span>
       </AnimatePresence>
       <span className="sr-only">{label}</span>
     </button>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Minus, Plus } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 type StepperProps = {
@@ -60,7 +60,7 @@ export function Stepper({ label, hint, value, min = 0, max, onChange, disabled =
           className="relative inline-flex h-9 w-10 items-center justify-center overflow-hidden text-lg font-bold tnum"
         >
           <AnimatePresence initial={false} mode="popLayout" custom={dir}>
-            <motion.span
+            <m.span
               key={value}
               custom={dir}
               variants={{
@@ -75,7 +75,7 @@ export function Stepper({ label, hint, value, min = 0, max, onChange, disabled =
               className="absolute"
             >
               {value}
-            </motion.span>
+            </m.span>
           </AnimatePresence>
         </output>
         <HoldButton label={`Somar 1 (${u})`} disabled={disabled || value >= max} className={btnCls} onStep={() => step(1)}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "motion/react";
+import { m, useMotionValue, useReducedMotion, useSpring, useTransform } from "motion/react";
 import type { ReactNode } from "react";
 import { useFinePointer } from "@/lib/hooks";
 
@@ -18,7 +18,7 @@ export function TiltFrame({ children, className = "" }: { children: ReactNode; c
 
   return (
     <div className="[perspective:1400px]">
-      <motion.div
+      <m.div
         className={className}
         style={enabled ? { rotateX: rx, rotateY: ry, transformStyle: "preserve-3d" } : undefined}
         onPointerMove={(e) => {
@@ -33,7 +33,7 @@ export function TiltFrame({ children, className = "" }: { children: ReactNode; c
         }}
       >
         {children}
-      </motion.div>
+      </m.div>
     </div>
   );
 }

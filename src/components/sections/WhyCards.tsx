@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useInView, useReducedMotion } from "motion/react";
+import { m, useInView, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Reveal } from "@/components/motion/Reveal";
 
@@ -52,30 +52,30 @@ function Dedupe({ phase }: { phase: number }) {
   return (
     <div className="flex h-full flex-col justify-center gap-2 text-[11px] font-semibold tnum">
       <div className="relative h-6">
-        <motion.div
+        <m.div
           className="absolute inset-y-0 left-0 flex origin-left items-center rounded-[4px] bg-accent px-2 text-on-accent"
           animate={{ width: merged ? "100%" : "79%", y: merged ? 16 : 0 }}
           transition={{ duration: 0.6, ease: EASE }}
         >
-          <motion.span animate={{ opacity: merged ? 0 : 1 }}>Meta 642</motion.span>
-        </motion.div>
+          <m.span animate={{ opacity: merged ? 0 : 1 }}>Meta 642</m.span>
+        </m.div>
       </div>
       <div className="relative h-6">
-        <motion.div
+        <m.div
           className="absolute inset-y-0 left-0 flex items-center rounded-[4px] bg-muted px-2 text-fg"
           animate={{ width: merged ? "100%" : "58%", y: merged ? -16 : 0, opacity: merged ? 0 : 1 }}
           transition={{ duration: 0.6, ease: EASE }}
         >
           Google 470
-        </motion.div>
+        </m.div>
       </div>
-      <motion.p
+      <m.p
         className="absolute top-1/2 left-6 -translate-y-1/2 text-[12px] text-on-accent"
         animate={{ opacity: merged ? 1 : 0 }}
         transition={{ delay: merged ? 0.35 : 0, duration: 0.25 }}
       >
         812 confirmadas
-      </motion.p>
+      </m.p>
     </div>
   );
 }
@@ -87,7 +87,7 @@ function Ctr({ phase }: { phase: number }) {
       <div className="text-center">
         <p className="relative inline-block text-[30px] font-bold text-fg-2">
           4,6%
-          <motion.span
+          <m.span
             className="absolute inset-x-[-4px] top-1/2 h-[3px] origin-left bg-error"
             animate={{ scaleX: on ? 1 : 0 }}
             transition={{ duration: 0.4, ease: EASE }}
@@ -95,10 +95,10 @@ function Ctr({ phase }: { phase: number }) {
         </p>
         <p className="text-[10px] text-fg-2">média de médias</p>
       </div>
-      <motion.div className="text-center" animate={{ opacity: on ? 1 : 0.15, x: on ? 0 : -8 }} transition={{ delay: on ? 0.3 : 0, duration: 0.4, ease: EASE }}>
+      <m.div className="text-center" animate={{ opacity: on ? 1 : 0.15, x: on ? 0 : -8 }} transition={{ delay: on ? 0.3 : 0, duration: 0.4, ease: EASE }}>
         <p className="text-[30px] font-bold text-accent">1,7%</p>
         <p className="text-[10px] text-fg-2">cliques ÷ impressões</p>
-      </motion.div>
+      </m.div>
     </div>
   );
 }
@@ -114,13 +114,13 @@ function Maturing({ phase }: { phase: number }) {
         return (
           <div key={i} className="relative flex-1" style={{ height: `${h}%` }}>
             {late && (
-              <motion.div
+              <m.div
                 className="absolute inset-0 rounded-t-[3px] border border-dashed border-accent"
                 animate={{ opacity: on ? 1 : 0 }}
                 transition={{ delay: on ? 0.25 + (i - 7) * 0.08 : 0, duration: 0.3 }}
               />
             )}
-            <motion.div
+            <m.div
               className="absolute inset-0 origin-bottom rounded-t-[3px] bg-accent"
               animate={{ scaleY: late ? (on ? 1 : 0.38 + (i - 7) * -0.08) : 1, opacity: late && !on ? 0.55 : 1 }}
               transition={{ duration: 0.55, ease: EASE, delay: late ? (i - 7) * 0.06 : 0 }}
@@ -128,13 +128,13 @@ function Maturing({ phase }: { phase: number }) {
           </div>
         );
       })}
-      <motion.span
+      <m.span
         className="absolute top-3 right-3 rounded-chip bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-fg"
         animate={{ opacity: on ? 1 : 0 }}
         transition={{ delay: on ? 0.4 : 0 }}
       >
         em maturação
-      </motion.span>
+      </m.span>
     </div>
   );
 }

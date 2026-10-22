@@ -65,7 +65,10 @@ export function AudioWave() {
         </div>
       </div>
       <p className="mt-2 min-h-[1.4em] text-[13px] text-fg-2" aria-hidden>
-        {shown ? `“${shown}${shown.length === CAPTION.length ? "”" : ""}` : <span className="opacity-70">Toque ou passe o mouse para ouvir uma leitura</span>}
+        {shown ? `“${shown}${shown.length === CAPTION.length ? "”" : ""}` : "Toque ou passe o mouse para ouvir uma leitura"}
+      </p>
+      <p className="mt-1 text-[11px] text-fg-2">
+        Amostra · dados fictícios
       </p>
     </div>
   );

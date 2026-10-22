@@ -42,19 +42,19 @@ function Kpi({
       className={`m-in min-w-0 rounded-[9px] border p-2.5 ${strong ? "border-transparent bg-accent text-on-accent" : "border-line bg-card"}`}
       style={{ "--d": `${delay}ms` } as CSSProperties}
     >
-      <p className={`line-clamp-2 min-h-[2.3em] text-[9px] leading-[1.15] font-medium tracking-[0.08em] uppercase ${strong ? "opacity-80" : "text-fg-2"}`}>
+      <p className={`line-clamp-2 min-h-[2.3em] text-[9px] leading-[1.15] font-medium tracking-[0.08em] uppercase ${strong ? "" : "text-fg-2"}`}>
         {label}
       </p>
-      <p className="mt-1 text-[17px] leading-none font-bold tracking-[-0.02em] @[560px]:text-[19px]">
+      <p className={`mt-1 leading-none font-bold tracking-[-0.02em] ${value.length > 10 ? "text-[15px] @[560px]:text-[16px]" : "text-[17px] @[560px]:text-[19px]"}`}>
         <Odometer value={value} />
       </p>
-      <p className={`mt-1.5 text-[10px] leading-tight ${strong ? "opacity-80" : "text-fg-2"}`}>{sub}</p>
+      <p className={`mt-1.5 text-[10px] leading-tight ${strong ? "" : "text-fg-2"}`}>{sub}</p>
     </div>
   );
 }
 
 function Delta({ good, children }: { good: boolean; children: ReactNode }) {
-  return <span className={`font-semibold ${good ? "text-accent" : "text-error"}`}>{children}</span>;
+  return <span className={`font-semibold ${good ? "text-accent" : "text-error-fg"}`}>{children}</span>;
 }
 
 export function DashboardMock({ data, name, assemble, live = false, seed, introTarget }: DashboardMockProps) {

@@ -40,7 +40,6 @@ export function PromptHeadline({ id }: { id: string }) {
 
   const animating = motionOK;
   const shown = !animating ? LINE1 : LINE1.slice(0, typed ?? 0);
-  const doneTyping = !animating || (typed ?? 0) >= LINE1.length;
   const line2State = !animating ? "static" : stage === "typing" ? "idle" : "play";
   const broken = animating && stage === "broken";
 
@@ -49,7 +48,7 @@ export function PromptHeadline({ id }: { id: string }) {
       <span className="mt-[0.18em] shrink-0 text-[0.5em] font-medium text-accent tnum">›_</span>
       <span className="min-h-[1em]">
         {shown}
-        {!doneTyping || !broken ? <span className="caret text-accent" /> : null}
+        {animating && !broken && <span className="caret text-accent" />}
       </span>
     </span>
   );
@@ -64,13 +63,13 @@ export function PromptHeadline({ id }: { id: string }) {
         <span className="relative block max-w-[16em]">
           <span
             className="block transition-transform duration-500 ease-brand"
-            style={{ clipPath: "inset(-10% -10% 50% -10%)", transform: broken ? "translateY(-0.09em) rotate(-0.6deg)" : undefined }}
+            style={{ clipPath: "inset(-10% -10% 50% -10%)", transform: broken ? "translateY(-0.045em) rotate(-0.4deg)" : undefined }}
           >
             {box}
           </span>
           <span
             className="absolute inset-0 block transition-transform duration-500 ease-brand"
-            style={{ clipPath: "inset(50% -10% -10% -10%)", transform: broken ? "translate(0.08em, 0.09em) rotate(0.4deg)" : undefined }}
+            style={{ clipPath: "inset(50% -10% -10% -10%)", transform: broken ? "translate(0.04em, 0.045em) rotate(0.25deg)" : undefined }}
           >
             {box}
           </span>

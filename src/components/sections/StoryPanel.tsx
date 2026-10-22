@@ -1,9 +1,10 @@
 "use client";
 
 import { Check, FileText, Link2, MousePointer2 } from "lucide-react";
-import { AnimatePresence, LayoutGroup, motion, useInView, useReducedMotion } from "motion/react";
+import { AnimatePresence, LayoutGroup, m, useInView, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Icon } from "@/components/brand/Icon";
+import { LayoutFeatures } from "@/components/motion/MotionRoot";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -31,9 +32,12 @@ export function StoryPanel({ step }: { step: number }) {
       <span className="absolute top-3 left-4 z-10 text-[11px] font-medium tracking-[0.08em] text-fg-2 uppercase">
         Passo 0{step + 1}
       </span>
+      <span className="absolute bottom-3 left-4 z-10 rounded-chip border border-line bg-bg px-2.5 py-0.5 text-[11px] text-fg-2">
+        Amostra · dados fictícios
+      </span>
       <AnimatePresence mode="wait" initial={false}>
         {seen && (
-        <motion.div
+        <m.div
           key={step}
           className="absolute inset-0"
           initial={reduce ? { opacity: 0 } : { clipPath: "inset(50% 0 50% 0)" }}
@@ -42,23 +46,28 @@ export function StoryPanel({ step }: { step: number }) {
           transition={{ duration: reduce ? 0.15 : 0.5, ease: EASE }}
         >
           {step === 0 && <ConnectScene active={active} />}
-          {step === 1 && <TemplateScene active={active} />}
+          {step === 1 && (
+            <LayoutFeatures>
+              <TemplateScene active={active} />
+            </LayoutFeatures>
+          )}
           {step === 2 && <SendScene active={active} />}
-        </motion.div>
+        </m.div>
         )}
       </AnimatePresence>
     </div>
   );
 }
 
+// x é a distância da borda do próprio lado (esquerda ou direita), em %
 const CHIPS = [
-  { label: "Meta Ads", x: 5, y: 22, side: -1 },
-  { label: "Google Ads", x: 5, y: 46, side: -1 },
-  { label: "GA4", x: 5, y: 70, side: -1 },
-  { label: "TikTok Ads", x: 73, y: 16, side: 1, pro: true },
-  { label: "LinkedIn Ads", x: 73, y: 36, side: 1, pro: true },
-  { label: "Mercado Ads", x: 73, y: 56, side: 1, pro: true },
-  { label: "HubSpot", x: 73, y: 76, side: 1, pro: true },
+  { label: "Meta Ads", x: 4, y: 22, side: -1 },
+  { label: "Google Ads", x: 4, y: 46, side: -1 },
+  { label: "GA4", x: 4, y: 70, side: -1 },
+  { label: "TikTok Ads", x: 3, y: 16, side: 1, pro: true },
+  { label: "LinkedIn Ads", x: 3, y: 36, side: 1, pro: true },
+  { label: "Mercado Ads", x: 3, y: 56, side: 1, pro: true },
+  { label: "HubSpot", x: 3, y: 76, side: 1, pro: true },
 ];
 
 function ConnectScene({ active }: { active: boolean }) {
@@ -69,17 +78,17 @@ function ConnectScene({ active }: { active: boolean }) {
       {/* linhas de dados até o painel */}
       <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
         {CHIPS.map((c, i) => {
-          const fromX = c.side < 0 ? 27 : 73;
+          const fromX = c.side < 0 ? 18 : 82;
           const toX = c.side < 0 ? 38 : 62;
           const y = c.y + 3;
           return (
-            <motion.path
+            <m.path
               key={c.label}
               d={`M${fromX},${y} C${(fromX + toX) / 2},${y} ${(fromX + toX) / 2},50 ${toX},50`}
               fill="none"
               stroke={c.pro ? "var(--muted)" : "var(--accent)"}
-              strokeWidth="1.5"
-              vectorEffect="non-scaling-stroke"
+              // sem non-scaling-stroke: com pathLength ele quebra o traço em tracejado
+              strokeWidth="0.32"
               initial={play ? { pathLength: 0 } : false}
               animate={{ pathLength: 1 }}
               transition={{ delay: 0.55 + i * 0.07, duration: 0.6, ease: EASE }}
@@ -88,13 +97,13 @@ function ConnectScene({ active }: { active: boolean }) {
         })}
       </svg>
       {/* painel */}
-      <div className="absolute top-[24%] left-[38%] h-[52%] w-[24%] rounded-[10px] border border-line bg-card p-[4%]">
+      <div className="absolute top-[26%] left-[39%] h-[48%] w-[22%] rounded-[10px] border border-line bg-card p-[3%]">
         <div className="mx-auto w-1/3">
           <Icon className="text-accent" />
         </div>
         <div className="mt-[10%] space-y-[8%]">
           {[80, 56, 68].map((w, i) => (
-            <motion.div
+            <m.div
               key={w}
               className="h-1.5 origin-left rounded-full bg-accent"
               style={{ width: `${w}%`, opacity: 1 - i * 0.25 }}
@@ -106,19 +115,19 @@ function ConnectScene({ active }: { active: boolean }) {
         </div>
       </div>
       {CHIPS.map((c, i) => (
-        <motion.span
+        <m.span
           key={c.label}
-          className={`absolute inline-flex items-center gap-1 rounded-chip border px-2.5 py-1 text-[11px] font-medium whitespace-nowrap sm:text-[12px] ${
+          className={`absolute inline-flex items-center gap-1 rounded-chip border px-2 py-1 text-[10px] font-medium whitespace-nowrap sm:px-2.5 sm:text-[12px] ${
             c.pro ? "border-line bg-card text-fg-2" : "border-transparent bg-accent text-on-accent"
           }`}
-          style={{ left: `${c.x}%`, top: `${c.y}%` }}
+          style={c.side < 0 ? { left: `${c.x}%`, top: `${c.y}%` } : { right: `${c.x}%`, top: `${c.y}%` }}
           initial={play ? { x: c.side * 220, y: (i % 2 ? -1 : 1) * 40, rotate: c.side * 12, opacity: 0 } : false}
           animate={{ x: 0, y: 0, rotate: 0, opacity: 1 }}
           transition={{ type: "spring", stiffness: 140, damping: 16, delay: i * 0.06 }}
         >
           {c.label}
           {c.pro && <span className="rounded-chip bg-accent-soft px-1 text-[9px] text-fg">Pro</span>}
-        </motion.span>
+        </m.span>
       ))}
     </div>
   );
@@ -137,15 +146,15 @@ const LAYOUTS: Record<"ecom" | "imob", Record<string, Rect>> = {
     k1: { l: 6, t: 20, w: 28, h: 18 },
     k2: { l: 36, t: 20, w: 28, h: 18 },
     k3: { l: 66, t: 20, w: 28, h: 18 },
-    main: { l: 6, t: 42, w: 56, h: 50 },
-    side: { l: 64, t: 42, w: 30, h: 50 },
+    main: { l: 6, t: 42, w: 56, h: 44 },
+    side: { l: 64, t: 42, w: 30, h: 44 },
   },
   imob: {
-    main: { l: 6, t: 20, w: 58, h: 46 },
-    k1: { l: 66, t: 20, w: 28, h: 14 },
-    k2: { l: 66, t: 36, w: 28, h: 14 },
-    k3: { l: 66, t: 52, w: 28, h: 14 },
-    side: { l: 6, t: 70, w: 88, h: 22 },
+    main: { l: 6, t: 20, w: 58, h: 44 },
+    k1: { l: 66, t: 20, w: 28, h: 13 },
+    k2: { l: 66, t: 35, w: 28, h: 13 },
+    k3: { l: 66, t: 50, w: 28, h: 14 },
+    side: { l: 6, t: 67, w: 88, h: 19 },
   },
 };
 
@@ -172,16 +181,16 @@ function TemplateScene({ active }: { active: boolean }) {
           const r = LAYOUTS[layout][t.id];
           const kind = t.id === "main" ? (layout === "ecom" ? "line" : "scatter") : t.kind;
           return (
-            <motion.div
+            <m.div
               key={t.id}
               layout
               transition={{ type: "spring", stiffness: 170, damping: 22 }}
               className="absolute overflow-hidden rounded-[10px] border border-line bg-card p-2.5"
               style={{ left: `${r.l}%`, top: `${r.t}%`, width: `${r.w}%`, height: `${r.h}%` }}
             >
-              <motion.p layout="position" className="text-[10px] font-medium tracking-[0.06em] text-fg-2 uppercase">
+              <m.p layout="position" className="text-[10px] font-medium tracking-[0.06em] text-fg-2 uppercase">
                 {t.id === "main" ? (layout === "ecom" ? "Custo por venda" : "Investimento × CPL") : t.id === "k1" && layout === "imob" ? "CPL" : t.label}
-              </motion.p>
+              </m.p>
               {kind === "kpi" && <div className="mt-1.5 h-2.5 w-3/5 rounded-full bg-fg/80" />}
               {kind === "line" && (
                 <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="mt-2 h-[70%] w-full" aria-hidden>
@@ -210,7 +219,7 @@ function TemplateScene({ active }: { active: boolean }) {
                   ))}
                 </div>
               )}
-            </motion.div>
+            </m.div>
           );
         })}
       </LayoutGroup>
@@ -231,7 +240,7 @@ function SendScene({ active }: { active: boolean }) {
   return (
     <div key={cycle} className="absolute inset-0 flex items-center justify-center">
       {/* folha de PDF que desliza para fora */}
-      <motion.div
+      <m.div
         className="absolute flex h-[52%] w-[34%] flex-col rounded-[8px] border border-line bg-card p-3"
         style={{ left: "38%", top: "26%" }}
         initial={play ? { x: 0, y: 0, rotate: 0, opacity: 0 } : false}
@@ -246,10 +255,10 @@ function SendScene({ active }: { active: boolean }) {
         <svg viewBox="0 0 100 40" className="mt-auto w-full" aria-hidden>
           <path d="M0,32 L20,26 L40,28 L60,18 L80,16 L100,8" fill="none" stroke="var(--accent)" strokeWidth="2.5" />
         </svg>
-      </motion.div>
+      </m.div>
 
       {/* o painel encolhe e vira um card de link */}
-      <motion.div
+      <m.div
         className="relative w-[64%] rounded-[12px] border border-line bg-card p-4"
         initial={play ? { scale: 1.35, opacity: 0.6 } : false}
         animate={{ scale: 1, opacity: 1, x: "-14%" }}
@@ -262,26 +271,26 @@ function SendScene({ active }: { active: boolean }) {
           <Link2 size={13} aria-hidden className="shrink-0" />
           <span className="truncate tnum">vyz.app/r/loja-verde</span>
         </div>
-        <motion.div
+        <m.div
           className="relative mt-2 inline-flex h-8 items-center gap-1.5 overflow-hidden rounded-[8px] bg-accent px-3 text-[12px] font-semibold text-on-accent"
           initial={false}
           animate={play ? { scale: [1, 1, 0.92, 1] } : undefined}
           transition={{ delay: 1.05, duration: 0.35, times: [0, 0.01, 0.4, 1] }}
         >
-          <motion.span initial={play ? { opacity: 1 } : { opacity: 0 }} animate={{ opacity: 0 }} transition={{ delay: 1.2, duration: 0.15 }}>
+          <m.span initial={play ? { opacity: 1 } : { opacity: 0 }} animate={{ opacity: 0 }} transition={{ delay: 1.2, duration: 0.15 }}>
             Copiar link
-          </motion.span>
-          <motion.span
+          </m.span>
+          <m.span
             className="absolute inset-0 inline-flex items-center justify-center gap-1"
             initial={play ? { opacity: 0, y: 8 } : false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1.25, duration: 0.25 }}
           >
             <Check size={13} aria-hidden /> Copiado
-          </motion.span>
-        </motion.div>
+          </m.span>
+        </m.div>
         {play && (
-          <motion.span
+          <m.span
             className="pointer-events-none absolute text-fg"
             style={{ left: "70%", top: "110%" } as CSSProperties}
             initial={{ x: 0, y: 0, opacity: 0 }}
@@ -290,9 +299,9 @@ function SendScene({ active }: { active: boolean }) {
             aria-hidden
           >
             <MousePointer2 size={18} fill="currentColor" />
-          </motion.span>
+          </m.span>
         )}
-      </motion.div>
+      </m.div>
     </div>
   );
 }

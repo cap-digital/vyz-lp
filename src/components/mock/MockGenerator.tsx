@@ -7,7 +7,6 @@ import { usePlan } from "@/components/state/PlanProvider";
 import { Segmented } from "@/components/ui/Segmented";
 import { btn } from "@/components/ui/styles";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
-import { useIntro } from "@/lib/hooks";
 import { ecommerceData, imobData, seedFor, type MockMode, type MockTipo } from "@/lib/mock-data";
 import { MSG_SEGMENT, waLink } from "@/lib/whatsapp";
 import { DashboardMock } from "./DashboardMock";
@@ -23,15 +22,15 @@ export const GENERATOR_INPUT_ID = "gerador-nome";
 /** O gestor vê o que está comprando antes de comprar. */
 export function MockGenerator() {
   const { update } = usePlan();
-  const intro = useIntro();
   const [mode, setMode] = useState<MockMode>("dashboard");
   const [draft, setDraft] = useState("");
   const [tipo, setTipo] = useState<Tipo>("ecommerce");
   const [applied, setApplied] = useState<Applied>({ mode: "dashboard", name: DEFAULT_NAME, tipo: "ecommerce" });
   const [builds, setBuilds] = useState(0);
 
-  // a intro também monta o primeiro mock
-  const buildKey = builds + (intro.revealed ? 1 : 0);
+  // o primeiro mock já chega pronto (a linha da intro pousa na meta dele);
+  // a montagem peça por peça fica para cada "Gerar"
+  const buildKey = builds;
   const assemble = buildKey > 0;
 
   function generate(e?: FormEvent) {
@@ -63,7 +62,7 @@ export function MockGenerator() {
               { value: "landing", label: "Landing page" },
             ]}
           />
-          <p className="label-caps text-fg-2">Gerador de exemplo</p>
+          <p className="label-caps hidden text-fg-2 sm:block">Gerador de exemplo</p>
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <label className="block">

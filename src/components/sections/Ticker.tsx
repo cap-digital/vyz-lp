@@ -28,7 +28,7 @@ function Row() {
           <span className="inline-flex items-baseline gap-2 px-5">
             <span className="text-fg-2">{it.label}</span>
             <span className="font-semibold text-fg">{it.value}</span>
-            {it.delta && <span className={it.good ? "text-accent" : "text-error"}>{it.delta}</span>}
+            {it.delta && <span className={it.good ? "text-accent" : "text-error-fg"}>{it.delta}</span>}
           </span>
           <span className="text-line" aria-hidden>
             ·
@@ -64,6 +64,9 @@ export function Ticker() {
         <Row />
         <Row />
       </div>
+      <span className="absolute inset-y-0 left-0 z-10 flex items-center border-r border-line bg-card px-4 text-[11px] font-medium text-fg-2">
+        Amostra · dados fictícios
+      </span>
     </div>
   );
 }

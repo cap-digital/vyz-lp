@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useMotionValue, useReducedMotion, useSpring } from "motion/react";
+import { m, useMotionValue, useReducedMotion, useSpring } from "motion/react";
 import { useEffect } from "react";
 import { useFinePointer } from "@/lib/hooks";
 
@@ -28,7 +28,7 @@ export function GridBackdrop() {
 
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden [mask-image:radial-gradient(ellipse_80%_70%_at_50%_40%,#000_40%,transparent_100%)]">
-      <motion.svg className="absolute -inset-8 h-[calc(100%+4rem)] w-[calc(100%+4rem)]" style={{ x: sx, y: sy }}>
+      <m.svg className="absolute -inset-8 h-[calc(100%+4rem)] w-[calc(100%+4rem)]" style={{ x: sx, y: sy }}>
         <defs>
           <pattern id="malha" width="240" height="240" patternUnits="userSpaceOnUse">
             {Array.from({ length: 10 }, (_, i) => (
@@ -41,7 +41,7 @@ export function GridBackdrop() {
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#malha)" />
-      </motion.svg>
+      </m.svg>
     </div>
   );
 }

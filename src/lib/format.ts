@@ -21,6 +21,7 @@ export function brl(cents: number, { decimals = true }: { decimals?: boolean } =
 export function brlCompact(cents: number): string {
   const reais = cents / 100;
   if (reais >= 1_000_000) return `R$ ${decimal(reais / 1_000_000, 1)} mi`;
+  if (reais >= 100_000) return `R$ ${int(reais / 1000)} mil`;
   if (reais >= 10_000) return `R$ ${decimal(reais / 1000, 1)} mil`;
   return brl(cents, { decimals: false });
 }

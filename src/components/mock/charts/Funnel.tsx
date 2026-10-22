@@ -23,7 +23,7 @@ export function Funnel({ steps, title }: { steps: FunnelStep[]; title: string })
               />
             </div>
             {i === drop && (
-              <p className="m-blink mt-0.5 text-[10px] font-semibold text-error" style={{ "--d": `${900 + steps.length * 140}ms` } as CSSProperties}>
+              <p className="m-blink mt-0.5 text-[10px] font-semibold text-error-fg" style={{ "--d": `${900 + steps.length * 140}ms` } as CSSProperties}>
                 ↓ maior queda
               </p>
             )}
