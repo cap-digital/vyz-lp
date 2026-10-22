@@ -5,6 +5,8 @@
 
 import { Monitor, Plus, Smartphone, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { ColorField } from "@/components/ui/ColorField";
+import { FileInput, readImage } from "@/components/ui/FileInput";
 import { Checkbox, LockBadge, PendingChip, TextField } from "@/components/ui/kit";
 import { btn } from "@/components/ui/styles";
 import { LANDING_SECTIONS, SECTION_LABEL, type LandingContent, type LandingSection, type LandingTemplate } from "@/features/templates/landing-pages";
@@ -42,37 +44,32 @@ export function ContentFields({ t, value, onChange }: { t: LandingTemplate; valu
       <fieldset className="space-y-3">
         <legend className="mb-1 text-[13px] font-semibold text-fg-2">Marca</legend>
         <TextField label="Nome da marca" value={value.brand} onChange={(brand) => set({ brand })} placeholder="Loja Verde" />
-        <div className="flex flex-wrap items-end gap-4">
-          <label className="block text-[13px] font-medium">
-            Logo (até 300 KB)
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/svg+xml,image/webp"
-              className="mt-1 block text-[13px] file:mr-3 file:rounded-control file:border file:border-line file:bg-card file:px-3 file:py-1.5 file:text-fg"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                if (f.size > 300_000) return setLogoError("Use uma imagem de até 300 KB.");
-                const r = new FileReader();
-                r.onload = () => {
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start">
+          <FileInput
+            label="Logo"
+            hint="PNG, JPG, SVG ou WebP, até 300 KB"
+            accept="image/png,image/jpeg,image/svg+xml,image/webp"
+            error={logoError}
+            compact
+            onFile={(f) =>
+              readImage(
+                f,
+                300_000,
+                (logo) => {
                   setLogoError(null);
-                  set({ logo: String(r.result) });
-                };
-                r.readAsDataURL(f);
-              }}
-            />
-          </label>
-          {value.logo && (
-            <button type="button" onClick={() => set({ logo: undefined })} className={`${btn.ghost} h-8 px-2 text-[13px]`}>
-              Remover logo
-            </button>
-          )}
-          <label className="flex items-center gap-2 text-[13px] font-medium">
-            Cor principal
-            <input type="color" value={value.color} onChange={(e) => set({ color: e.target.value })} className="h-9 w-14 rounded-control border border-line bg-field" />
-          </label>
+                  set({ logo });
+                },
+                setLogoError,
+              )
+            }
+          />
+          <ColorField label="Cor principal" value={value.color} onChange={(color) => set({ color })} />
         </div>
-        {logoError && <p className="text-[12px] text-error-fg">{logoError}</p>}
+        {value.logo && (
+          <button type="button" onClick={() => set({ logo: undefined })} className={`${btn.ghost} h-8 px-2 text-[13px]`}>
+            Remover logo
+          </button>
+        )}
       </fieldset>
 
       <fieldset className="space-y-3">

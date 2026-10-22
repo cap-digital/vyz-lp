@@ -4,7 +4,8 @@
 // estado vazio, abas e cadeado. Mesmos tokens da LP, sem sombra.
 
 import { Info, Lock, X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { PortalContainer } from "./portal";
 
 /** Aviso discreto do que depende de backend, com tooltip. */
 export function PendingChip({ label, detail, className = "" }: { label: string; detail?: string; className?: string }) {
@@ -58,8 +59,10 @@ export function Modal({
   full?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const [host, setHost] = useState<HTMLDialogElement | null>(null);
   useEffect(() => {
     const d = ref.current;
+    setHost(d);
     if (!d) return;
     if (open && !d.open) d.showModal();
     if (!open && d.open) d.close();
@@ -69,6 +72,8 @@ export function Modal({
     <dialog
       ref={ref}
       onClose={onClose}
+      // Esc com um popover aberto fecha só o popover
+      onCancel={(e) => ref.current?.querySelector("[data-radix-popper-content-wrapper]") && e.preventDefault()}
       onClick={(e) => e.target === ref.current && onClose()}
       aria-label={title}
       className={`m-auto max-h-[calc(100dvh-2rem)] overflow-hidden rounded-card border border-line bg-bg p-0 text-fg backdrop:bg-black/55 ${size}`}
@@ -81,7 +86,9 @@ export function Modal({
               <X size={18} aria-hidden />
             </button>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <PortalContainer.Provider value={host}>{children}</PortalContainer.Provider>
+          </div>
         </div>
       )}
     </dialog>
@@ -110,7 +117,7 @@ export function TextField({ label, value, onChange, placeholder, hint, error, ty
         {label}
       </label>
       <div
-        className={`flex h-10 items-center rounded-control border bg-field text-[14px] transition-colors focus-within:border-accent ${error ? "border-error" : "border-line"} ${disabled ? "opacity-50" : ""}`}
+        className={`flex h-10 items-center rounded-control border bg-field text-[14px] transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent ${error ? "border-error" : "border-line"} ${disabled ? "opacity-50" : ""}`}
       >
         {prefix && <span className="pl-3 text-fg-2">{prefix}</span>}
         <input
@@ -136,41 +143,9 @@ export function TextField({ label, value, onChange, placeholder, hint, error, ty
   );
 }
 
-export function SelectField({ label, value, onChange, options, hint }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; hint?: string }) {
-  const id = useId();
-  return (
-    <div className="space-y-1">
-      <label htmlFor={id} className="block text-[13px] font-medium text-fg">
-        {label}
-      </label>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-full rounded-control border border-line bg-field px-3 text-[14px] text-fg outline-none focus-visible:border-accent"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      {hint && <p className="text-[12px] text-fg-2">{hint}</p>}
-    </div>
-  );
-}
-
-export function Checkbox({ label, checked, onChange, disabled, hint }: { label: ReactNode; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; hint?: ReactNode }) {
-  return (
-    <label className={`flex items-start gap-2.5 text-[14px] ${disabled ? "opacity-50" : ""}`}>
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 size-4 shrink-0 accent-[var(--accent)]" />
-      <span>
-        {label}
-        {hint && <span className="block text-[12px] text-fg-2">{hint}</span>}
-      </span>
-    </label>
-  );
-}
+// Select e Checkbox moraram aqui com controles nativos; agora são os da marca.
+export { SelectField } from "./Select";
+export { Checkbox } from "./controls";
 
 /** Estado vazio com ilustração geométrica no estilo da malha do logo. */
 export function EmptyState({ title, text, action }: { title: string; text: string; action?: ReactNode }) {

@@ -6,17 +6,19 @@
 import { Check } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import type { ComponentProps, ReactNode } from "react";
+import { usePortalContainer } from "./portal";
 
 export const Menu = DropdownMenu.Root;
 export const MenuTrigger = DropdownMenu.Trigger;
 
 export function MenuContent({ children, className = "", sideOffset = 4, ...rest }: ComponentProps<typeof DropdownMenu.Content>) {
+  const container = usePortalContainer();
   return (
-    <DropdownMenu.Portal>
+    <DropdownMenu.Portal container={container}>
       <DropdownMenu.Content
         sideOffset={sideOffset}
         collisionPadding={8}
-        className={`pop z-[80] min-w-[12rem] rounded-card border border-line bg-card p-1 text-fg outline-none ${className}`}
+        className={`pop z-[80] max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[12rem] overflow-y-auto rounded-card border border-line bg-card p-1 text-fg outline-none ${className}`}
         {...rest}
       >
         {children}

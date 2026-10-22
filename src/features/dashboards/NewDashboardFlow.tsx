@@ -3,6 +3,9 @@
 import { ArrowDown, ArrowLeft, ArrowRight, Check, GripVertical, Lock, Plus } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ColorField } from "@/components/ui/ColorField";
+import { RadioCard, RadioGroup } from "@/components/ui/controls";
+import { FileInput, readImage } from "@/components/ui/FileInput";
 import { Checkbox, LockBadge, PendingChip, SelectField, TextField } from "@/components/ui/kit";
 import { btn } from "@/components/ui/styles";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
@@ -185,15 +188,16 @@ export function NewDashboardFlow() {
                   </div>
                   {!locked && (
                     <div className="mt-3 space-y-2">
-                      {options.map((a) => (
-                        <label key={a.id} className={`flex cursor-pointer items-center gap-3 rounded-control border p-3 text-[14px] ${chosen === a.id ? "border-accent" : "border-line"}`}>
-                          <input type="radio" name={`acc-${src}`} checked={chosen === a.id} onChange={() => save({ accounts: { ...draft.accounts, [src]: a.id } })} className="accent-[var(--accent)]" />
-                          <span className="min-w-0">
-                            <span className="block truncate font-medium">{a.name}</span>
-                            <span className="block text-[12.5px] text-fg-2 tnum">{accountIdLabel(a)}</span>
-                          </span>
-                        </label>
-                      ))}
+                      <RadioGroup label={`Conta de ${p.name}`} value={chosen} onChange={(id) => save({ accounts: { ...draft.accounts, [src]: id } })} className="space-y-2">
+                        {options.map((a) => (
+                          <RadioCard key={a.id} value={a.id} checked={chosen === a.id}>
+                            <span className="min-w-0">
+                              <span className="block truncate font-medium">{a.name}</span>
+                              <span className="block text-[12.5px] text-fg-2 tnum">{accountIdLabel(a)}</span>
+                            </span>
+                          </RadioCard>
+                        ))}
+                      </RadioGroup>
                       {adding === src ? (
                         <div className="rounded-control border border-line p-3">
                           <AccountForm
@@ -435,31 +439,24 @@ export function BrandFields({ value, onChange }: { value: { logo?: string; color
         )}
       </div>
       <div className="space-y-3">
-        <label className="block text-[13px] font-medium">
-          Logo (PNG, JPG ou SVG, até 300 KB)
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/svg+xml,image/webp"
-            className="mt-1 block w-full text-[13px] file:mr-3 file:rounded-control file:border file:border-line file:bg-card file:px-3 file:py-1.5 file:text-fg"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              if (f.size > 300_000) return setError("Use uma imagem de até 300 KB.");
-              const r = new FileReader();
-              r.onload = () => {
+        <FileInput
+          label="Logo"
+          hint="PNG, JPG, SVG ou WebP, até 300 KB"
+          accept="image/png,image/jpeg,image/svg+xml,image/webp"
+          error={error}
+          onFile={(f) =>
+            readImage(
+              f,
+              300_000,
+              (logo) => {
                 setError(null);
-                onChange({ ...value, logo: String(r.result) });
-              };
-              r.readAsDataURL(f);
-            }}
-          />
-        </label>
-        {error && <p className="text-[12px] text-error-fg">{error}</p>}
-        <label className="flex items-center gap-3 text-[13px] font-medium">
-          Cor principal
-          <input type="color" value={value.color} onChange={(e) => onChange({ ...value, color: e.target.value })} className="h-9 w-14 rounded-control border border-line bg-field" />
-          <span className="text-fg-2 tnum">{value.color.toUpperCase()}</span>
-        </label>
+                onChange({ ...value, logo });
+              },
+              setError,
+            )
+          }
+        />
+        <ColorField label="Cor principal" value={value.color} onChange={(color) => onChange({ ...value, color })} />
         <Checkbox label="Ocultar a marca VYZ (dashboard, link e PDF)" checked={value.hideVyz} onChange={(hideVyz) => onChange({ ...value, hideVyz })} />
         {value.logo && (
           <button type="button" className={`${btn.ghost} h-8 px-2 text-[13px]`} onClick={() => onChange({ ...value, logo: undefined })}>

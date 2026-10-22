@@ -2,7 +2,9 @@
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Wordmark } from "@/components/brand/Wordmark";
-import { PendingChip, SelectField, Tabs } from "@/components/ui/kit";
+import { Switch } from "@/components/ui/controls";
+import { PendingChip, Tabs } from "@/components/ui/kit";
+import { PeriodPicker, rangeDays, type Range } from "@/components/ui/PeriodPicker";
 import { PLATFORMS } from "@/features/accounts/platforms";
 import { onColor } from "@/features/landing-pages/LandingRenderer";
 import { dashboardTemplate } from "@/features/templates/dashboards";
@@ -49,6 +51,7 @@ export function DashboardBody({ spec, hideSpend, assemble, actions, printing }: 
   const [page, setPage] = useState<PageId>(spec.pages[0] ?? "visao-geral");
   const [period, setPeriod] = useState<PeriodId>(spec.settings.period);
   const [customDays, setCustomDays] = useState(spec.settings.customDays || 14);
+  const [range, setRange] = useState<Range | null>(null);
   const [compare, setCompare] = useState(true);
   const days = periodDays({ period, customDays });
   const ds = useMemo(() => datasetFor({ ...spec, settings: spec.settings }, days), [spec, days]);
@@ -87,26 +90,24 @@ export function DashboardBody({ spec, hideSpend, assemble, actions, printing }: 
           <Tabs label="Páginas do dashboard" value={active} onChange={setPage} items={spec.pages.map((p) => ({ value: p, label: PAGES[p].name }))} />
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <div className="w-44">
-            <SelectField label="Período" value={period} onChange={(v) => setPeriod(v as PeriodId)} options={PERIODS} />
+          <div className="w-60">
+            <PeriodPicker
+              period={period}
+              range={range}
+              customDays={customDays}
+              maxDays={60}
+              onChange={(p, r) => {
+                setPeriod(p);
+                if (r) {
+                  setRange(r);
+                  setCustomDays(Math.max(3, rangeDays(r)));
+                }
+              }}
+            />
           </div>
-          {period === "custom" && (
-            <label className="block w-24 text-[13px] font-medium">
-              Dias
-              <input
-                type="number"
-                min={3}
-                max={60}
-                value={customDays}
-                onChange={(e) => setCustomDays(Number(e.target.value) || 14)}
-                className="mt-1 h-10 w-full rounded-control border border-line bg-field px-3 text-[14px] tnum"
-              />
-            </label>
-          )}
-          <label className="flex h-10 items-center gap-2 rounded-control border border-line px-3 text-[13px]">
-            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} className="accent-[var(--accent)]" />
-            Comparar com o período anterior
-          </label>
+          <div className="flex h-10 items-center rounded-control border border-line px-3 text-[13px]">
+            <Switch label="Comparar com o período anterior" checked={compare} onChange={setCompare} />
+          </div>
         </div>
       </div>
 

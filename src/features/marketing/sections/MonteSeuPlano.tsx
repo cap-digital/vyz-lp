@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { AnimatePresence, m, useInView, useReducedMotion } from "motion/react";
 import { useRef, type ReactNode } from "react";
 import { CutReveal } from "@/components/motion/CutReveal";
+import { Checkbox } from "@/components/ui/controls";
 import { Odometer } from "@/components/ui/Odometer";
 import { Reveal } from "@/components/motion/Reveal";
 import { SectionWipe } from "@/components/motion/SectionWipe";
@@ -229,15 +230,9 @@ export function MonteSeuPlano() {
                       unit="landing page"
                       onChange={(lp) => update({ lp })}
                     />
-                    <label className={`mb-2 flex items-center gap-2.5 text-[14px] ${state.lp ? "text-fg" : "text-fg-2"}`}>
-                      <input
-                        type="checkbox"
-                        checked={state.lpcare}
-                        onChange={(e) => update({ lpcare: e.target.checked })}
-                        className="size-4 accent-[var(--accent)]"
-                      />
-                      Hospedagem e ajustes · {brl(LP_CARE_MONTHLY)}/mês por LP
-                    </label>
+                    <div className={`mb-2 ${state.lp ? "text-fg" : "text-fg-2"}`}>
+                      <Checkbox label={`Hospedagem e ajustes · ${brl(LP_CARE_MONTHLY)}/mês por LP`} checked={state.lpcare} onChange={(lpcare) => update({ lpcare })} />
+                    </div>
                   </div>
                   <div className="pb-2">
                     <Stepper
