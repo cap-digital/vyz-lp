@@ -1,31 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useElementSize, type Size } from "./useSize";
 
-type Size = { width: number; height: number };
+type FitChartProps = {
+  children: (size: Size) => ReactNode;
+  className?: string;
+  /** Altura fixa em px (a largura vem do contêiner). Sem ela, a altura vem do CSS. */
+  height?: number;
+  minHeight?: number;
+};
 
 /**
  * Mede o espaço disponível e entrega largura e altura reais para o gráfico
- * desenhar em tamanho de leitura (sem scale). O observer se desliga ao desmontar.
+ * desenhar em px (sem scale). Só desenha depois da primeira medida.
  */
-export function FitChart({ children, className = "", minHeight = 140 }: { children: (size: Size) => ReactNode; className?: string; minHeight?: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState<Size | null>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => {
-      const w = Math.floor(el.clientWidth);
-      const h = Math.floor(el.clientHeight);
-      setSize((s) => (s && s.width === w && s.height === h ? s : { width: w, height: h }));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+export function FitChart({ children, className = "", height, minHeight = 140 }: FitChartProps) {
+  const [ref, size] = useElementSize<HTMLDivElement>();
   return (
-    <div ref={ref} className={`relative min-h-0 w-full overflow-hidden ${className}`} style={{ minHeight }}>
+    <div ref={ref} className={`relative min-h-0 w-full overflow-hidden ${className}`} style={height ? { height } : { minHeight }}>
       {size && size.width > 0 && size.height > 0 && <div className="absolute inset-0">{children(size)}</div>}
     </div>
   );

@@ -49,7 +49,9 @@ src/
                 controles próprios (nada nativo): Select, Menu, Tooltip (Radix), Checkbox/Radio/Switch,
                 NumberStepper, PeriodPicker, FileInput, ColorField. Dentro de Modal, os popovers montam
                 no próprio <dialog> (portal.ts)
-    charts/     LineChart, Funnel, Scatter, BarList, Bars, ProgressBar
+    charts/     LineChart, Funnel, Scatter, BarList, Sparkline: desenhados sempre em px reais (useSize mede o
+                contêiner; viewBox = tamanho medido), texto de 11 a 12 px, ticks pela largura (axis.ts).
+                Só as miniaturas das galerias são escaladas (ScaledPreview). O PDF mede o A4 (277 mm)
     motion/     só para (marketing): CutReveal, Reveal, Magnetic, SmoothScroll, ScrollProgress, SectionWipe, MotionRoot
   features/
     pricing/        pricing.ts (preços), entitlements.ts (limites)

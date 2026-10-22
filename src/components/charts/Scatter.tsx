@@ -1,4 +1,7 @@
+"use client";
+
 import type { CSSProperties } from "react";
+import { FitChart } from "./FitChart";
 import { aroundPoint, cornersOf, placeLabel, textWidth, type Rect } from "./labels";
 
 type Point = { name: string; invest: number; cpl: number; bad?: boolean };
@@ -33,18 +36,23 @@ export function scatterLayout(points: Point[], W: number, H: number, fontSize: n
 
 type ScatterProps = { points: Point[]; width?: number; height?: number; fontSize?: number };
 
-/** Investimento × custo por lead, um ponto por empreendimento. O ruim fica em vermelho terroso. */
-export function Scatter({ points, width, height, fontSize = 8.5 }: ScatterProps) {
-  // com largura e altura medidas, desenha em tamanho real; sem elas, escala no contêiner
-  const real = width !== undefined && height !== undefined;
-  const W = width ?? 320;
-  const H = height ?? 160;
+/**
+ * Investimento × custo por lead, um ponto por empreendimento. O ruim fica em
+ * vermelho terroso. Sempre em px reais: com largura e altura, desenha direto;
+ * sem elas, mede a largura do contêiner (altura fixa).
+ */
+export function Scatter({ points, width, height, fontSize = 11 }: ScatterProps) {
+  if (width !== undefined && height !== undefined) return <ScatterSvg points={points} W={width} H={height} fontSize={fontSize} />;
+  return <FitChart height={height ?? 220}>{({ width: W, height: H }) => <ScatterSvg points={points} W={W} H={H} fontSize={fontSize} />}</FitChart>;
+}
+
+function ScatterSvg({ points, W, H, fontSize }: { points: Point[]; W: number; H: number; fontSize: number }) {
   const { plot, quadrant, dots, qLabel, pLabel, bad, lh } = scatterLayout(points, W, H, fontSize);
   const summary = `Dispersão de ${points.length} empreendimentos: investimento no eixo horizontal, custo por lead no vertical.${bad ? ` ${bad.name} gasta muito e tem lead caro.` : ""}`;
   const baseline = (r: Rect) => r.y + lh / 2 + fontSize * 0.36;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width={real ? W : undefined} height={real ? H : undefined} role="img" aria-label={summary} className={`block overflow-visible ${real ? "" : "h-auto w-full"}`}>
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={summary} className="block">
       <title>{summary}</title>
       <rect className="m-late" style={{ "--d": "1300ms" } as CSSProperties} x={quadrant.x} y={quadrant.y} width={quadrant.w} height={quadrant.h} rx="4" fill="var(--error-soft)" opacity="0.7" />
       <line x1={plot.x} x2={plot.x} y1={plot.y} y2={plot.y + plot.h} stroke="var(--line)" />

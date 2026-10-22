@@ -9,7 +9,7 @@ import { Scatter } from "@/components/charts/Scatter";
 import { Odometer, zeroed } from "@/components/ui/Odometer";
 import { PLATFORMS, type PlatformId } from "@/features/accounts/platforms";
 import { byPlatform, currentTotals, delta, maturedAverage, previousTotals, series, type Totals } from "@/features/metrics/compute";
-import { formatValue, isGood, metric, type MetricId, type Profile } from "@/features/metrics/definitions";
+import { formatValue, isGood, metric, type MetricDef, type MetricId, type Profile } from "@/features/metrics/definitions";
 import type { Dataset } from "@/features/metrics/source";
 import type { KpiSpec, WidgetSpec } from "@/features/templates/types";
 import { brl, brlCompact, decimal, int, pct } from "@/lib/format";
@@ -137,7 +137,7 @@ export function Widget({ spec, ctx, delay }: { spec: WidgetSpec; ctx: WidgetCont
       );
     case "scatter":
       return (
-        <Card title={title} delay={delay} aside={<span className="text-[9.5px] text-fg-2">1 ponto = 1 empreendimento</span>}>
+        <Card title={title} delay={delay} aside={<span className="text-[11px] text-fg-2">1 ponto = 1 empreendimento</span>}>
           <Scatter points={ds.projects} />
         </Card>
       );
@@ -304,6 +304,22 @@ function BarsWidget({ spec, ctx }: { spec: BarsSpec; ctx: WidgetContext }) {
 }
 
 /** Dados da linha diária + média móvel (mesmo cálculo no painel e na LP). */
+/** Rótulos do eixo Y: curtos, sem centavos. */
+function axisFormat(format: MetricDef["format"]): (v: number) => string {
+  switch (format) {
+    case "brl":
+      return (v) => brl(v, { decimals: false });
+    case "brlCompact":
+      return brlCompact;
+    case "int":
+      return (v) => int(Math.round(v));
+    case "pct":
+      return (v) => pct(v, v !== 0 && Math.abs(v) < 0.1 ? 1 : 0);
+    case "decimal":
+      return (v) => decimal(v, 1);
+  }
+}
+
 export function lineData(spec: Extract<WidgetSpec, { type: "line" }>, ctx: WidgetContext) {
   const { ds, profile } = ctx;
   const values = series(ds.current, spec.metric);
@@ -312,7 +328,7 @@ export function lineData(spec: Extract<WidgetSpec, { type: "line" }>, ctx: Widge
   const goal = spec.goal ? ds.goal : undefined;
   const last = avg.filter(Number.isFinite).at(-1) ?? 0;
   const summary = `${def.label} diário dos últimos ${values.length} dias, com média móvel de 7 dias em ${formatValue(last, def.format)}${goal ? `, meta de ${brl(goal)}` : ""}. Os últimos 3 dias estão em maturação.`;
-  return { values, avg, goal, goalLabel: goal ? brl(goal, { decimals: false }) : undefined, maturingDays: 3, summary };
+  return { values, avg, goal, goalLabel: goal ? brl(goal, { decimals: false }) : undefined, maturingDays: 3, summary, ago: ds.current.map((r) => r.ago), formatY: axisFormat(def.format) };
 }
 
 function PlatformCards({ ctx }: { ctx: WidgetContext }) {

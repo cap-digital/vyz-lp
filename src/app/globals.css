@@ -753,6 +753,14 @@ details.lines summary::-webkit-details-marker {
 
 /* ---- Impressão (PDF do dashboard) ----------------------------------- */
 /* A4 paisagem, uma página do dashboard por folha, sempre nas cores do modo claro. */
+/* PDF: o miolo da impressão já nasce na largura útil do A4 deitado
+   (297 − 2 × 10 mm), também na tela, para os gráficos medirem a página e não
+   a janela. */
+.print-root {
+  width: 277mm;
+  max-width: none;
+}
+
 @media print {
   @page {
     size: A4 landscape;
@@ -804,6 +812,10 @@ details.lines summary::-webkit-details-marker {
   }
   .print-page > * {
     break-inside: avoid;
+  }
+  /* Ctrl+P fora do "Exportar PDF": o gráfico medido na tela não vaza da página */
+  svg[role="img"] {
+    max-width: 100%;
   }
 }
 

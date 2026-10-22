@@ -27,11 +27,12 @@ export function DashboardView({ id }: { id: string }) {
     if (!printing || !d) return;
     const done = () => setPrinting(false);
     window.addEventListener("afterprint", done, { once: true });
+    // espera os gráficos medirem a largura do A4 (ResizeObserver + 1 quadro)
     const t = window.setTimeout(() => {
       window.print();
       const rec: ExportRecord = { id: newId("x_"), dashboardId: d.id, dashboardName: d.name, kind: "pdf", createdAt: new Date().toISOString() };
       store.put("exports", rec);
-    }, 120);
+    }, 300);
     return () => {
       window.clearTimeout(t);
       window.removeEventListener("afterprint", done);

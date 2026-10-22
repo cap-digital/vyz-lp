@@ -43,7 +43,7 @@ export function Funnel({ steps, title, size = "sm", fill = false }: FunnelProps)
               <div className="m-bar h-full rounded-[3px]" style={{ width: `${Math.max(2, s.pct)}%`, background: SEQ[i], "--d": `${620 + i * 140}ms` } as CSSProperties} />
             </div>
             {i === drop && (
-              <p className={`m-blink mt-0.5 font-semibold text-error-fg ${lg ? "text-[12px]" : "text-[10px]"}`} style={{ "--d": `${900 + steps.length * 140}ms` } as CSSProperties}>
+              <p className={`m-blink mt-0.5 font-semibold text-error-fg ${lg ? "text-[12px]" : "text-[11px]"}`} style={{ "--d": `${900 + steps.length * 140}ms` } as CSSProperties}>
                 ↓ maior queda
               </p>
             )}

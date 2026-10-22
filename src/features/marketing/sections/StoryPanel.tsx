@@ -14,6 +14,7 @@ import { Funnel } from "@/components/charts/Funnel";
 import { textWidth } from "@/components/charts/labels";
 import { LineChart, LineLegend } from "@/components/charts/LineChart";
 import { Scatter } from "@/components/charts/Scatter";
+import { Sparkline } from "@/components/charts/Sparkline";
 import { barData, Kpi, lineData, makeContext } from "@/features/dashboards/widgets/Widgets";
 import { MockSource } from "@/features/metrics/source";
 import { dashboardTemplate } from "@/features/templates/dashboards";
@@ -339,9 +340,8 @@ function SendScene({ fill }: { fill: boolean }) {
             </div>
           ))}
         </dl>
-        <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="mt-auto h-[38%] w-full" aria-hidden>
-          <path d="M0,8 L20,12 L40,10 L60,20 L80,23 L100,31" fill="none" stroke="var(--accent)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
-        </svg>
+        {/* custo caindo: a linha desce */}
+        <Sparkline values={[32, 28, 30, 20, 17, 9]} className="mt-auto h-[38%]" />
       </m.div>
 
       {/* o painel encolhe e vira um card de link */}
@@ -355,9 +355,9 @@ function SendScene({ fill }: { fill: boolean }) {
           <p className="text-[12px] font-medium tracking-[0.06em] text-fg-2 uppercase">Relatório · Loja Verde</p>
           <p className="mt-1 text-[26px] font-bold tracking-[-0.02em] tnum @[560px]:text-[34px]">R$ 61,20</p>
           <p className="text-[13px] text-accent">▼ 8,2% no custo por venda</p>
-          <svg viewBox="0 0 100 24" preserveAspectRatio="none" className="mt-3 hidden h-14 w-full @[560px]:block" aria-hidden>
-            <path d="M0,6 L14,9 L28,7 L42,12 L56,14 L70,13 L84,18 L100,19" fill="none" stroke="var(--accent)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
-          </svg>
+          <div className="mt-3 hidden @[560px]:block">
+            <Sparkline values={[18, 15, 17, 12, 10, 11, 6, 5]} className="h-14" />
+          </div>
           <div className="mt-3 flex items-center gap-2 rounded-control border border-line bg-bg px-3 py-2 text-[13px] text-fg-2">
             <Link2 size={15} aria-hidden className="shrink-0" />
             <span className="truncate tnum">vyz.app/r/loja-verde</span>
