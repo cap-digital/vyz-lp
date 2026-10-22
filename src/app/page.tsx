@@ -33,12 +33,23 @@ export default function Home() {
         <Navbar />
         <main id="conteudo">
           <Hero />
-          <Ticker />
-          <ComoFunciona />
-          <Planos />
-          <MonteSeuPlano />
+          {/* cada dobra numa fronteira própria: a hidratação sai fatiada, sem tarefa longa */}
+          <Suspense>
+            <Ticker />
+          </Suspense>
+          <Suspense>
+            <ComoFunciona />
+          </Suspense>
+          <Suspense>
+            <Planos />
+          </Suspense>
+          <Suspense>
+            <MonteSeuPlano />
+          </Suspense>
         </main>
-        <Footer />
+        <Suspense>
+          <Footer />
+        </Suspense>
       </PlanProvider>
     </MotionRoot>
   );

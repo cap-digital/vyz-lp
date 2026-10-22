@@ -37,9 +37,13 @@ export function SmoothScroll() {
       lenis = null;
     };
     const onChange = () => (mq.matches ? stop() : start());
-    start();
+    // fora do caminho crítico: liga quando o navegador estiver ocioso
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 300));
+    const cancelIdle = window.cancelIdleCallback ?? window.clearTimeout;
+    const handle = idle(start);
     mq.addEventListener("change", onChange);
     return () => {
+      cancelIdle(handle);
       mq.removeEventListener("change", onChange);
       stop();
     };

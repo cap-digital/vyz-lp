@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useMotionValue, useReducedMotion, useSpring } from "motion/react";
+import { m, useMotionValue, useReducedMotion, useSpring } from "motion/react";
 import type { ReactNode } from "react";
 
 type MagneticProps = {
@@ -18,7 +18,7 @@ export function Magnetic({ children, strength = 0.28, className = "" }: Magnetic
   const sy = useSpring(y, { stiffness: 260, damping: 18, mass: 0.6 });
 
   return (
-    <motion.span
+    <m.span
       className={`inline-flex ${className}`}
       style={{ x: sx, y: sy }}
       onPointerMove={(e) => {
@@ -33,6 +33,6 @@ export function Magnetic({ children, strength = 0.28, className = "" }: Magnetic
       }}
     >
       {children}
-    </motion.span>
+    </m.span>
   );
 }

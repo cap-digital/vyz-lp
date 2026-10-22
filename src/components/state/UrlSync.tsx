@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { startTransition, useEffect, useRef } from "react";
 import { fromQuery, toQuery } from "@/lib/pricing";
 import { usePlan } from "./PlanProvider";
 
@@ -19,7 +19,9 @@ export function UrlSync() {
     if (restored.current) return;
     restored.current = true;
     const fromUrl = fromQuery(params);
-    if (fromUrl) update(fromUrl);
+    // como transição, o React termina de hidratar as dobras antes de aplicar o
+    // estado da URL (senão o HTML pré-renderizado não bate com o novo estado)
+    if (fromUrl) startTransition(() => update(fromUrl));
   }, [params, update]);
 
   const first = useRef(true);

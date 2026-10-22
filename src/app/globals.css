@@ -348,11 +348,11 @@ html.lenis body {
   overflow: hidden;
 }
 .odo-strip {
-  display: flex;
-  flex-direction: column;
+  display: block;
+  white-space: pre;
+  line-height: 1.15em;
   transition: transform 750ms var(--ease);
 }
-.odo-strip > span,
 .odo-char {
   display: block;
   height: 1.15em;

@@ -1,4 +1,5 @@
-const DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+// a fita de 0 a 9 é um só nó de texto, uma linha por dígito (DOM leve)
+const STRIP = "0\n1\n2\n3\n4\n5\n6\n7\n8\n9";
 
 type OdometerProps = {
   value: string;
@@ -37,9 +38,7 @@ export function Odometer({ value, className = "", stagger = 28 }: OdometerProps)
                   transitionDelay: `${fromRight * stagger}ms`,
                 }}
               >
-                {DIGITS.map((d) => (
-                  <span key={d}>{d}</span>
-                ))}
+                {STRIP}
               </span>
             </span>
           );
