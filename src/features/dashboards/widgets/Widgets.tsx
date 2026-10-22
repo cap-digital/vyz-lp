@@ -1,0 +1,579 @@
+// Widgets do dashboard. Os mesmos componentes servem o gerador da LP, o passo 2
+// de "Como funciona", as miniaturas, o painel e o link público: só muda o Dataset.
+
+import type { CSSProperties, ReactNode } from "react";
+import { BarList } from "@/components/charts/BarList";
+import { Funnel } from "@/components/charts/Funnel";
+import { LineChart } from "@/components/charts/LineChart";
+import { Scatter } from "@/components/charts/Scatter";
+import { Odometer, zeroed } from "@/components/ui/Odometer";
+import { PLATFORMS, type PlatformId } from "@/features/accounts/platforms";
+import { byPlatform, currentTotals, delta, maturedAverage, previousTotals, series, type Totals } from "@/features/metrics/compute";
+import { formatValue, isGood, metric, type MetricId, type Profile } from "@/features/metrics/definitions";
+import type { Dataset } from "@/features/metrics/source";
+import type { KpiSpec, WidgetSpec } from "@/features/templates/types";
+import { brl, brlCompact, decimal, int, pct } from "@/lib/format";
+
+export type WidgetContext = {
+  ds: Dataset;
+  profile: Profile;
+  cur: Totals;
+  prev: Totals;
+  /** Esconde valores de investimento (links compartilhados). */
+  hideSpend?: boolean;
+  /** Números zerados antes de rolar (montagem). */
+  zero?: boolean;
+  /** Marca a linha da meta para a intro da LP. */
+  markGoal?: boolean;
+};
+
+export function makeContext(ds: Dataset, opts: Partial<WidgetContext> = {}): WidgetContext {
+  return { ds, profile: ds.spec.profile, cur: currentTotals(ds), prev: previousTotals(ds), ...opts };
+}
+
+const HIDDEN = "•••";
+const short = (id: PlatformId) => PLATFORMS[id].short;
+
+export function Card({ title, children, delay = 440, className = "", aside }: { title?: string; children: ReactNode; delay?: number; className?: string; aside?: ReactNode }) {
+  return (
+    <section className={`m-in min-w-0 rounded-[10px] border border-line bg-card p-3 ${className}`} style={{ "--d": `${delay}ms` } as CSSProperties}>
+      {(title || aside) && (
+        <header className="mb-2 flex items-baseline justify-between gap-2">
+          {title && <h3 className="text-[11.5px] leading-snug font-semibold text-fg">{title}</h3>}
+          {aside}
+        </header>
+      )}
+      {children}
+    </section>
+  );
+}
+
+function Delta({ cur, prev, id, profile, suffix = "" }: { cur: number; prev: number; id: MetricId; profile: Profile; suffix?: string }) {
+  const d = delta(cur, prev);
+  const good = isGood(d, metric(id, profile).better);
+  const color = good === null ? "text-fg-2" : good ? "text-accent" : "text-error-fg";
+  return (
+    <span className={`font-semibold ${color}`}>
+      {d >= 0 ? "▲" : "▼"} {pct(Math.abs(d))}
+      {suffix}
+    </span>
+  );
+}
+
+// ---- KPI ------------------------------------------------------------------
+
+export function Kpi({ spec, ctx, delay }: { spec: KpiSpec; ctx: WidgetContext; delay: number }) {
+  const { cur, prev, ds, profile } = ctx;
+  const def = metric(spec.metric, profile);
+  const hidden = ctx.hideSpend && spec.metric === "spend";
+  const raw = formatValue(cur[spec.metric], def.format);
+  const value = hidden ? HIDDEN : ctx.zero ? zeroed(raw) : raw;
+  const strong = spec.highlight;
+
+  let sub: ReactNode = null;
+  switch (spec.sub) {
+    case "delta":
+      sub = <Delta cur={cur[spec.metric]} prev={prev[spec.metric]} id={spec.metric} profile={profile} suffix=" vs anterior" />;
+      break;
+    case "split": {
+      const parts = byPlatform(ds).map((p) => `${short(p.id)} ${int(p.conv)}`);
+      sub = parts.length ? parts.join(" · ") : "Confirmadas no GA4";
+      break;
+    }
+    case "breakEven":
+      sub = `Equilíbrio ${decimal(ds.breakEven)}`;
+      break;
+    case "ofLeads":
+      sub = `de ${int(cur.leads || cur.conversions)} leads`;
+      break;
+    case "budget":
+      sub = hidden ? "da verba do mês" : `${pct(ds.budget.spent / ds.budget.monthly, 0)} da verba do mês`;
+      break;
+    case "goal":
+      sub = `meta ${brl(ds.goal, { decimals: false })}`;
+      break;
+  }
+
+  return (
+    <div
+      className={`m-in min-w-0 rounded-[10px] border p-2.5 ${strong ? "border-transparent bg-accent text-on-accent" : "border-line bg-card"}`}
+      style={{ "--d": `${delay}ms` } as CSSProperties}
+      title={def.help}
+    >
+      <p className={`min-h-[2.3em] text-[9.5px] leading-[1.15] font-medium tracking-[0.08em] uppercase ${strong ? "" : "text-fg-2"}`}>{def.label}</p>
+      <p className={`mt-1 leading-none font-bold tracking-[-0.02em] ${value.length > 10 ? "text-[15px] @[900px]:text-[18px]" : "text-[17px] @[900px]:text-[21px]"}`}>
+        <Odometer value={value} />
+      </p>
+      <p className={`mt-1.5 text-[10px] leading-tight ${strong ? "[&_span]:text-inherit" : "text-fg-2"}`}>{sub}</p>
+    </div>
+  );
+}
+
+// ---- widgets ----------------------------------------------------------------
+
+export function Widget({ spec, ctx, delay }: { spec: WidgetSpec; ctx: WidgetContext; delay: number }) {
+  const { ds, profile, cur } = ctx;
+  const title = spec.title;
+
+  switch (spec.type) {
+    case "line": {
+      const values = series(ds.current, spec.metric);
+      const avg = maturedAverage(ds.current, spec.metric);
+      const def = metric(spec.metric, profile);
+      const goal = spec.goal ? ds.goal : undefined;
+      const last = avg.filter(Number.isFinite).at(-1) ?? 0;
+      const summary = `${def.label} diário dos últimos ${values.length} dias, com média móvel de 7 dias em ${formatValue(last, def.format)}${goal ? `, meta de ${brl(goal)}` : ""}. Os últimos 3 dias estão em maturação.`;
+      return (
+        <Card title={title} delay={delay}>
+          <LineChart values={values} avg={avg} goal={goal} goalLabel={goal ? brl(goal, { decimals: false }) : undefined} maturingDays={3} summary={summary} markGoal={ctx.markGoal} />
+        </Card>
+      );
+    }
+    case "funnel":
+      return (
+        <Card title={title} delay={delay}>
+          <Funnel steps={ds.funnel} title={title ?? "Funil"} />
+        </Card>
+      );
+    case "scatter":
+      return (
+        <Card title={title} delay={delay} aside={<span className="text-[9.5px] text-fg-2">1 ponto = 1 empreendimento</span>}>
+          <Scatter points={ds.projects} />
+        </Card>
+      );
+    case "bars":
+      return (
+        <Card title={title} delay={delay}>
+          <BarsWidget spec={spec} ctx={ctx} />
+        </Card>
+      );
+    case "split": {
+      const plats = byPlatform(ds);
+      const total = plats.reduce((a, p) => a + p.conv, 0);
+      const max = Math.max(total, cur.conversions) || 1;
+      return (
+        <Card title={title} delay={delay}>
+          <div className="space-y-2 text-[10.5px]" role="img" aria-label={`Plataformas atribuem ${int(total)}; confirmadas ${int(cur.conversions)}.`}>
+            <div aria-hidden>
+              <p className="mb-1 flex justify-between text-fg-2">
+                <span>Soma do que as plataformas atribuem</span>
+                <span className="font-semibold tnum text-fg">{int(total)}</span>
+              </p>
+              <div className="flex h-3 overflow-hidden rounded-[3px]" style={{ width: `${(total / max) * 100}%` }}>
+                {plats.map((p, i) => (
+                  <span key={p.id} className="h-full" style={{ width: `${(p.conv / (total || 1)) * 100}%`, background: ["var(--seq-b)", "var(--seq-c)", "var(--seq-d)", "var(--muted)"][i % 4] }} />
+                ))}
+              </div>
+              <p className="mt-1 text-fg-2">{plats.map((p) => `${short(p.id)} ${int(p.conv)}`).join(" · ")}</p>
+            </div>
+            <div aria-hidden>
+              <p className="mb-1 flex justify-between text-fg-2">
+                <span>Confirmadas (sem dupla contagem)</span>
+                <span className="font-semibold tnum text-accent">{int(cur.conversions)}</span>
+              </p>
+              <div className="h-3 rounded-[3px] bg-accent" style={{ width: `${(cur.conversions / max) * 100}%` }} />
+            </div>
+          </div>
+        </Card>
+      );
+    }
+    case "platforms":
+      return (
+        <Card title={title} delay={delay}>
+          <PlatformCards ctx={ctx} />
+        </Card>
+      );
+    case "table":
+      return (
+        <Card title={title} delay={delay}>
+          <TableWidget source={spec.source} ctx={ctx} />
+        </Card>
+      );
+    case "creatives":
+      return (
+        <Card title={title} delay={delay}>
+          <Creatives ctx={ctx} />
+        </Card>
+      );
+    case "goals":
+      return (
+        <Card title={title} delay={delay}>
+          <Goals ctx={ctx} />
+        </Card>
+      );
+    case "audience":
+      return (
+        <Card title={title} delay={delay}>
+          <Audience ctx={ctx} />
+        </Card>
+      );
+    case "compare":
+      return (
+        <Card title={title} delay={delay}>
+          <Compare ctx={ctx} />
+        </Card>
+      );
+    case "crm":
+      return (
+        <Card title={title} delay={delay}>
+          <ul className="space-y-2" aria-label="Etapas do CRM">
+            {ds.crm.map((s, i) => (
+              <li key={s.stage} className="grid grid-cols-[5rem_1fr_auto] items-center gap-2 text-[11px]">
+                <span className="text-fg">{s.stage}</span>
+                <span className="h-3 rounded-[3px]" style={{ width: `${Math.max(3, (s.count / ds.crm[0].count) * 100)}%`, background: ["var(--seq-a)", "var(--seq-b)", "var(--seq-c)", "var(--seq-d)", "var(--accent)"][i] }} />
+                <span className="text-right tnum">
+                  <span className="font-semibold">{int(s.count)}</span>
+                  <span className="ml-2 text-fg-2">{ctx.hideSpend ? "" : brlCompact(s.value)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      );
+    case "alerts":
+      return (
+        <Card title={title} delay={delay}>
+          <ul className="space-y-2">
+            {ds.alerts.map((a) => (
+              <li key={a.title} className="flex gap-2.5 rounded-[8px] border border-line bg-bg p-2.5">
+                <span className={`mt-1 size-2 shrink-0 rounded-full ${a.level === "erro" ? "bg-error" : a.level === "atencao" ? "bg-warning" : "bg-info"}`} aria-hidden />
+                <span className="min-w-0">
+                  <span className="block text-[11.5px] font-semibold text-fg">{a.title}</span>
+                  <span className="block text-[10.5px] text-fg-2">{a.detail}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      );
+    case "audio":
+      return (
+        <Card title={title} delay={delay}>
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <div className="flex h-10 items-center gap-[3px] text-accent" aria-hidden>
+              {Array.from({ length: 24 }, (_, i) => (
+                <span key={i} className="w-[3px] rounded-full bg-current" style={{ height: `${20 + ((i * 37) % 70)}%` }} />
+              ))}
+            </div>
+            <p className="text-[13px] font-semibold text-fg">Em breve</p>
+            <p className="max-w-sm text-[11.5px] text-fg-2">Pergunte em voz alta e ouça a leitura dos números do período.</p>
+          </div>
+        </Card>
+      );
+  }
+}
+
+function BarsWidget({ spec, ctx }: { spec: Extract<WidgetSpec, { type: "bars" }>; ctx: WidgetContext }) {
+  const { ds, profile, cur } = ctx;
+  let items: { label: string; value: number; display: string }[] = [];
+  const fmt = (v: number) =>
+    spec.metric === "roas" ? decimal(v) : spec.metric === "conversions" ? int(v) : spec.metric === "spend" ? (ctx.hideSpend ? "" : brlCompact(v)) : brl(v);
+  if (spec.source === "campaigns") {
+    items = ds.campaigns.map((c) => {
+      const v = spec.metric === "roas" ? c.revenue / c.spend : spec.metric === "cpa" ? c.spend / c.conversions : spec.metric === "conversions" ? c.conversions : c.spend;
+      return { label: c.name, value: v, display: fmt(v) };
+    });
+  } else if (spec.source === "platforms") {
+    items = byPlatform(ds).map((p) => {
+      const v = spec.metric === "cpa" ? p.cpa : spec.metric === "conversions" ? p.conv : p.spend;
+      return { label: PLATFORMS[p.id].name, value: v, display: fmt(v) };
+    });
+  } else {
+    items = ds.clients.map((c) => {
+      const v = spec.metric === "spend" ? c.spend : spec.metric === "cpa" ? c.spend / c.conversions : c.conversions;
+      return { label: c.name, value: v, display: fmt(v) };
+    });
+  }
+  const reference =
+    spec.reference === "breakEven"
+      ? { value: ds.breakEven, label: `equilíbrio ${decimal(ds.breakEven)}` }
+      : spec.reference === "goal"
+        ? { value: ds.goal, label: `meta ${brl(ds.goal, { decimals: false })}` }
+        : undefined;
+  const better = spec.metric === "cpa" ? "down" : "up";
+  const def = metric(spec.metric === "roas" ? "roas" : spec.metric === "cpa" ? "cpa" : spec.metric === "spend" ? "spend" : "conversions", profile);
+  const summary = `${def.label} por item: ${items.map((i) => `${i.label} ${i.display}`).join(", ")}.${reference ? ` Referência: ${reference.label}.` : ""} Total do período: ${formatValue(cur[def.id], def.format)}.`;
+  return <BarList items={items} reference={reference} better={better} summary={summary} />;
+}
+
+function PlatformCards({ ctx }: { ctx: WidgetContext }) {
+  const { ds, cur } = ctx;
+  const plats = byPlatform(ds);
+  const hasGa4 = ds.spec.sources.includes("ga4");
+  return (
+    <div className="grid gap-2 @[460px]:grid-cols-2 @[900px]:grid-cols-3">
+      {plats.map((p) => (
+        <div key={p.id} className="rounded-[8px] border border-line bg-bg p-2.5 text-[10.5px]">
+          <p className="mb-1.5 text-[11px] font-semibold">{PLATFORMS[p.id].name}</p>
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-1 tnum">
+            <dt className="text-fg-2">Investimento</dt>
+            <dd className="text-right font-semibold">{ctx.hideSpend ? HIDDEN : brlCompact(p.spend)}</dd>
+            <dt className="text-fg-2">CTR</dt>
+            <dd className="text-right font-semibold">{pct(p.ctr, 2)}</dd>
+            <dt className="text-fg-2">Atribuídas</dt>
+            <dd className="text-right font-semibold">{int(p.conv)}</dd>
+            <dt className="text-fg-2">Custo atribuído</dt>
+            <dd className="text-right font-semibold">{brl(p.cpa)}</dd>
+          </dl>
+        </div>
+      ))}
+      {hasGa4 && (
+        <div className="rounded-[8px] border border-line bg-bg p-2.5 text-[10.5px]">
+          <p className="mb-1.5 text-[11px] font-semibold">GA4 · fonte de verdade</p>
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-1 tnum">
+            <dt className="text-fg-2">Sessões</dt>
+            <dd className="text-right font-semibold">{int(cur.sessions)}</dd>
+            <dt className="text-fg-2">Conversões</dt>
+            <dd className="text-right font-semibold text-accent">{int(cur.conversions)}</dd>
+            <dt className="text-fg-2">Taxa de conversão</dt>
+            <dd className="text-right font-semibold">{pct(cur.convRate, 2)}</dd>
+          </dl>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TableWidget({ source, ctx }: { source: "campaigns" | "products" | "clients"; ctx: WidgetContext }) {
+  const { ds, profile } = ctx;
+  const money = profile === "ecommerce" || profile === "marketplace" || profile === "executivo" || profile === "infoproduto" || profile === "site";
+  let head: string[] = [];
+  let rows: ReactNode[][] = [];
+  if (source === "campaigns") {
+    head = ["Campanha", "Plataforma", ctx.hideSpend ? "" : "Investimento", "CTR", metric("conversions", profile).label, metric("cpa", profile).label, money ? "ROAS" : ""].filter(Boolean);
+    rows = ds.campaigns.map((c) =>
+      [
+        c.name,
+        PLATFORMS[c.platform]?.short ?? "—",
+        ctx.hideSpend ? null : brlCompact(c.spend),
+        pct(c.clicks / Math.max(1, c.impressions), 2),
+        int(c.conversions),
+        brl(c.spend / c.conversions),
+        money ? decimal(c.revenue / c.spend) : null,
+      ].filter((v) => v !== null),
+    );
+  } else if (source === "products") {
+    head = ["Produto", "Vendidos", "Receita", "ROAS"];
+    rows = ds.products.map((p) => [p.name, int(p.sold), brlCompact(p.revenue), decimal(p.revenue / p.spend)]);
+  } else {
+    head = ["Cliente", ctx.hideSpend ? "" : "Investimento", "Conversões", "CPA", "Meta", "Status"].filter(Boolean);
+    rows = ds.clients.map((c) => {
+      const cpa = c.spend / c.conversions;
+      const ratio = cpa / c.goal;
+      const status = ratio <= 1 ? ["Na meta", "text-accent"] : ratio <= 1.15 ? ["Atenção", "text-warning"] : ["Fora da meta", "text-error-fg"];
+      return [
+        c.name,
+        ctx.hideSpend ? null : brlCompact(c.spend),
+        int(c.conversions),
+        brl(cpa),
+        brl(c.goal, { decimals: false }),
+        <span key="s" className={`font-semibold ${status[1]}`}>
+          {status[0]}
+        </span>,
+      ].filter((v) => v !== null);
+    });
+  }
+  return (
+    <div className="-mx-1 overflow-x-auto px-1">
+      <table className="w-full min-w-[420px] text-left text-[10.5px] tnum">
+        <thead>
+          <tr className="border-b border-line text-fg-2">
+            {head.map((h, i) => (
+              <th key={h} scope="col" className={`py-1.5 font-medium ${i ? "text-right" : ""}`}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-b border-line/60 last:border-0">
+              {r.map((cell, j) => (
+                <td key={j} className={`py-1.5 ${j ? "text-right" : "pr-2 font-medium text-fg"}`}>
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const TONES = ["#8A9A5B", "#6E9BC6", "#D9A441", "#C8B9A0", "#A3A69C"];
+
+function Creatives({ ctx }: { ctx: WidgetContext }) {
+  const { ds, profile } = ctx;
+  return (
+    <ul className="grid grid-cols-2 gap-2 @[600px]:grid-cols-4">
+      {ds.creatives.map((c) => {
+        const ctr = c.clicks / Math.max(1, c.impressions);
+        const cpa = c.conversions ? c.spend / c.conversions : NaN;
+        return (
+          <li key={c.id} className="overflow-hidden rounded-[8px] border border-line bg-bg">
+            {/* miniatura geométrica (amostra) */}
+            <div className="relative aspect-[4/3]" style={{ background: TONES[c.tone] }} aria-hidden>
+              <span className="absolute inset-x-[18%] top-[22%] h-[18%] rounded-[3px] bg-black/15" />
+              <span className="absolute inset-x-[18%] top-[48%] h-[8%] rounded-[3px] bg-white/35" />
+              <span className="absolute bottom-2 left-2 rounded-chip bg-black/35 px-1.5 text-[9px] text-white">{c.format}</span>
+            </div>
+            <div className="p-2 text-[10px]">
+              <p className="truncate font-semibold text-fg">{c.name}</p>
+              <dl className="mt-1 grid grid-cols-3 gap-1 tnum">
+                <div>
+                  <dt className="text-fg-2">CTR</dt>
+                  <dd className="font-semibold">{pct(ctr, 2)}</dd>
+                </div>
+                <div>
+                  <dt className="text-fg-2">{profile === "video" ? "CPV" : "CPA"}</dt>
+                  <dd className="font-semibold">{Number.isFinite(cpa) ? brl(cpa, { decimals: cpa < 100 }) : "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-fg-2">Freq.</dt>
+                  <dd className={`font-semibold ${c.frequency > 3 ? "text-warning" : ""}`}>{decimal(c.frequency)}</dd>
+                </div>
+              </dl>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Goals({ ctx }: { ctx: WidgetContext }) {
+  const { ds, cur } = ctx;
+  const b = ds.budget;
+  const pacing = b.day / b.daysInMonth;
+  const used = b.spent / b.monthly;
+  const projection = (b.spent / b.day) * b.daysInMonth;
+  const targetConv = Math.round(b.monthly / ds.goal);
+  const convToDate = Math.round(cur.conversions * (b.day / Math.max(1, ds.current.length)));
+  const rows = [
+    {
+      label: "Verba do mês",
+      value: used,
+      marker: pacing,
+      text: ctx.hideSpend ? `${pct(used, 0)} usado` : `${brlCompact(b.spent)} de ${brlCompact(b.monthly)}`,
+      note: ctx.hideSpend ? `Dia ${b.day} de ${b.daysInMonth}` : `Projeção: ${brlCompact(projection)} · dia ${b.day} de ${b.daysInMonth}`,
+      warn: used > pacing * 1.08,
+    },
+    {
+      label: "Conversões",
+      value: Math.min(1, convToDate / targetConv),
+      marker: pacing,
+      text: `${int(convToDate)} de ${int(targetConv)}`,
+      note: `Meta a ${brl(ds.goal, { decimals: false })} por conversão`,
+      warn: convToDate / targetConv < pacing * 0.9,
+    },
+    {
+      label: "Custo por conversão",
+      value: Math.min(1, ds.goal / Math.max(1, cur.cpa)),
+      marker: 1,
+      text: `${brl(cur.cpa)} · meta ${brl(ds.goal, { decimals: false })}`,
+      note: cur.cpa <= ds.goal ? "Dentro da meta" : "Acima da meta",
+      warn: cur.cpa > ds.goal,
+    },
+  ];
+  return (
+    <ul className="space-y-3.5">
+      {rows.map((r) => (
+        <li key={r.label} className="text-[10.5px]">
+          <p className="flex justify-between gap-2">
+            <span className="font-semibold text-fg">{r.label}</span>
+            <span className="tnum text-fg">{r.text}</span>
+          </p>
+          <div className="relative mt-1.5 h-2.5 rounded-[3px] bg-line">
+            <span className={`absolute inset-y-0 left-0 rounded-[3px] ${r.warn ? "bg-warning" : "bg-accent"}`} style={{ width: `${Math.min(100, r.value * 100)}%` }} />
+            <span className="absolute -inset-y-1 w-0 border-l border-dashed border-fg-2" style={{ left: `${Math.min(100, r.marker * 100)}%` }} aria-hidden />
+          </div>
+          <p className="mt-1 text-fg-2">{r.note}</p>
+        </li>
+      ))}
+      <li className="text-[10px] text-fg-2">A linha tracejada mostra onde o mês deveria estar hoje (pacing).</li>
+    </ul>
+  );
+}
+
+function Audience({ ctx }: { ctx: WidgetContext }) {
+  const { ds, profile } = ctx;
+  const max = Math.max(...ds.audience.map((a) => a.share));
+  return (
+    <div className="grid gap-4 @[600px]:grid-cols-[2fr_1fr]">
+      <ul className="space-y-2" aria-label="Faixas de idade">
+        {ds.audience.map((a) => (
+          <li key={a.label} className="grid grid-cols-[3rem_1fr_auto_auto] items-center gap-2 text-[10.5px] tnum">
+            <span className="text-fg-2">{a.label}</span>
+            <span className="h-2.5 rounded-[3px] bg-accent" style={{ width: `${(a.share / max) * 100}%` }} />
+            <span className="font-semibold">{pct(a.share, 0)}</span>
+            <span className={`w-16 text-right ${a.cpa > ds.goal * 1.15 ? "text-error-fg" : "text-fg-2"}`}>{brl(a.cpa, { decimals: false })}</span>
+          </li>
+        ))}
+        <li className="text-[10px] text-fg-2">Participação nas {metric("conversions", profile).label.toLowerCase()} e custo por conversão.</li>
+      </ul>
+      <div>
+        <div className="flex h-3 overflow-hidden rounded-[3px]">
+          {ds.gender.map((g, i) => (
+            <span key={g.label} style={{ width: `${g.share * 100}%`, background: i ? "var(--seq-c)" : "var(--accent)" }} />
+          ))}
+        </div>
+        <ul className="mt-2 space-y-1 text-[10.5px]">
+          {ds.gender.map((g) => (
+            <li key={g.label} className="flex justify-between">
+              <span className="text-fg-2">{g.label}</span>
+              <span className="font-semibold tnum">{pct(g.share, 0)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+const COMPARE: Partial<Record<Profile, MetricId[]>> = {
+  site: ["sessions", "convRate", "conversions", "revenue", "ticket"],
+  leads: ["spend", "leads", "cpl", "qualified", "ctr"],
+  imob: ["spend", "qualified", "cplq", "visits", "ctr"],
+  video: ["spend", "views", "cpv", "viewRate", "clicks"],
+};
+
+function Compare({ ctx }: { ctx: WidgetContext }) {
+  const { cur, prev, profile } = ctx;
+  const ids = (COMPARE[profile] ?? ["spend", "conversions", "cpa", "revenue", "roas", "ctr"]).filter((id) => !(ctx.hideSpend && id === "spend"));
+  return (
+    <table className="w-full text-[10.5px] tnum">
+      <thead>
+        <tr className="border-b border-line text-fg-2">
+          <th scope="col" className="py-1.5 text-left font-medium">
+            Métrica
+          </th>
+          <th scope="col" className="py-1.5 text-right font-medium">
+            Atual
+          </th>
+          <th scope="col" className="py-1.5 text-right font-medium">
+            Anterior
+          </th>
+          <th scope="col" className="py-1.5 text-right font-medium">
+            Variação
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {ids.map((id) => {
+          const def = metric(id, profile);
+          return (
+            <tr key={id} className="border-b border-line/60 last:border-0">
+              <td className="py-1.5 font-medium text-fg">{def.label}</td>
+              <td className="py-1.5 text-right font-semibold">{formatValue(cur[id], def.format)}</td>
+              <td className="py-1.5 text-right text-fg-2">{formatValue(prev[id], def.format)}</td>
+              <td className="py-1.5 text-right">
+                <Delta cur={cur[id]} prev={prev[id]} id={id} profile={profile} />
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}

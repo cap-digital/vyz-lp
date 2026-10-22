@@ -2,7 +2,6 @@
 
 import { useReducedMotion } from "motion/react";
 import { useSyncExternalStore } from "react";
-import { getIntro, SERVER_INTRO, subscribeIntro } from "./intro";
 
 const noop = () => () => {};
 
@@ -13,10 +12,6 @@ export function useHydrated(): boolean {
     () => true,
     () => false,
   );
-}
-
-export function useIntro() {
-  return useSyncExternalStore(subscribeIntro, getIntro, () => SERVER_INTRO);
 }
 
 function subscribeMedia(query: string) {

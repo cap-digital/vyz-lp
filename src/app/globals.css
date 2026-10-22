@@ -613,12 +613,6 @@ details.lines summary::-webkit-details-marker {
     transform: translateY(-26px);
   }
 }
-@keyframes slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(-24px);
-  }
-}
 @keyframes blink-once {
   0%,
   100% {
@@ -675,10 +669,8 @@ details.lines summary::-webkit-details-marker {
 [data-anim="on"] .m-unveil {
   animation: unveil 700ms cubic-bezier(0.45, 0, 0.2, 1) both;
 }
-[data-anim="on"] .m-side {
-  animation: slide-in 600ms var(--ease) both;
-  animation-delay: 120ms;
-}
+/* a sidebar do mock se revela junto com a varredura (animação própria nela
+   deixava a camada sem pintar no Chrome) */
 [data-anim="on"] .m-in {
   animation: rise 600ms var(--ease) both;
   animation-delay: var(--d, 0ms);

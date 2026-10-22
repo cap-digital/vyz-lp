@@ -2,7 +2,7 @@
 
 import { useInView } from "motion/react";
 import { useRef, type CSSProperties, type ReactNode } from "react";
-import { useIntro } from "@/lib/hooks";
+import { useIntro } from "@/features/marketing/intro";
 
 type Trigger = "view" | "intro";
 

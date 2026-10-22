@@ -1,0 +1,269 @@
+// Todos os preços, em centavos. Mudou preço? Muda só aqui.
+// Cada linha é arredondada em centavos e os totais somam as linhas.
+
+import { brl } from "@/lib/format";
+
+export type PlanId = "base" | "pro" | "avancado";
+export type PlanChoice = PlanId | "sem";
+export type Period = "mensal" | "anual";
+export type Nicho = "ecommerce" | "imobiliario";
+export type CustomBilling = "unico" | "recorrente";
+
+export const PLAN: Record<PlanId, Record<Period, number>> = {
+  base: { mensal: 4166, anual: 2833 }, // 1ª conta
+  pro: { mensal: 12500, anual: 8500 },
+  avancado: { mensal: 12500, anual: 8500 }, // = Pro + AUDIO_ADDON
+};
+
+export const EXTRA_ACCOUNT: Record<PlanId, Record<Period, number>> = {
+  base: { mensal: 9999, anual: 6799 },
+  pro: { mensal: 14999, anual: 10199 },
+  avancado: { mensal: 14999, anual: 10199 },
+};
+
+export const AUDIO_ADDON = 99000; // R$ 990/mês, só no Avançado, sem desconto anual
+export const PRO_TRACKING_VALUE = 177000; // R$ 1.770 (CAPI 690 + conversões otimizadas 490 + GA4 590), incluso no Pro e no Avançado
+export const DASH_CUSTOM = { unico: 190000, recorrente: { setup: 99000, mensal: 19900 } }; // R$ 1.900 ou R$ 990 + R$ 199/mês
+export const LP_TEAM_PRICE = 95000; // "Landing page feita pelo time", já com GTM
+export const LP_CARE_MONTHLY = 9900; // hospedagem e ajustes, por LP, opcional
+export const DASH_EXTRA_PRICE = 9900; // R$ 99
+export const MAX_ACCOUNTS_IN_PLAN = 30; // acima disso: sob consulta
+export const ANNUAL_SAVING_PCT = 32;
+export const WHATSAPP_NUMBER = "5571999575898"; // trocar quando a VYZ tiver número próprio
+
+/** Teto de cada contador de contas e de cada extra. */
+export const MAX_PER_PLATFORM = 99;
+export const MAX_EXTRA = 10;
+
+export const PLAN_LABEL: Record<PlanChoice, string> = {
+  base: "Base",
+  pro: "Pro",
+  avancado: "Avançado",
+  sem: "Sem plano",
+};
+
+export const PERIOD_LABEL: Record<Period, string> = { mensal: "mensal", anual: "anual" };
+
+export const NICHO_LABEL: Record<Nicho, string> = {
+  ecommerce: "E-commerce",
+  imobiliario: "Imobiliário",
+};
+
+export type PlanState = {
+  plano: PlanChoice;
+  periodo: Period;
+  meta: number;
+  google: number;
+  ga4: number;
+  /** TikTok, LinkedIn, marketplaces, CRMs: só o Pro e o Avançado aceitam. */
+  outras: number;
+  /** Landing pages feitas pelo time. */
+  lp: number;
+  /** Hospedagem e ajustes nas LPs (R$ 99/mês por LP). */
+  lpcare: boolean;
+  /** Dashboards sob medida. */
+  sob: number;
+  sobm: CustomBilling;
+  dash: number;
+  nicho: Nicho | null;
+};
+
+export const DEFAULT_STATE: PlanState = {
+  plano: "pro",
+  periodo: "anual",
+  meta: 1,
+  google: 1,
+  ga4: 0,
+  outras: 0,
+  lp: 0,
+  lpcare: false,
+  sob: 0,
+  sobm: "unico",
+  dash: 0,
+  nicho: null,
+};
+
+export type QuoteLine = {
+  id: string;
+  label: string;
+  detail?: string;
+  /** Quantidade, nas linhas de extras. */
+  qty?: number;
+  amount: number;
+  kind: "monthly" | "once" | "included";
+};
+
+export type Quote = {
+  /** Soma de todos os contadores. */
+  accountsTotal: number;
+  /** Contas que o plano aceita (o Base ignora "outras"). */
+  accountsAccepted: number;
+  /** Entre 1 e 30. */
+  accountsBilled: number;
+  /** Contas de outras plataformas guardadas fora do Base. */
+  accountsOutside: number;
+  /** Mais de 30 contas: sob consulta. */
+  overLimit: boolean;
+  /** Só o plano, por mês, no período escolhido. */
+  planMonthly: number;
+  /** Extras mensais (sem desconto no anual). */
+  extrasMonthly: number;
+  /** Todo mês = plano + extras mensais. */
+  monthly: number;
+  /** Todo mês, se fosse mensal / anual. */
+  monthlyMensal: number;
+  monthlyAnual: number;
+  /** Total cobrado por ano no anual (todo mês × 12). */
+  yearly: number;
+  /** (plano no mensal − plano no anual) × 12. */
+  annualSaving: number;
+  /** Itens únicos + setups. */
+  oneTime: number;
+  twelveMonths: number;
+  lines: QuoteLine[];
+};
+
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+
+export function acceptedAccounts(s: PlanState): number {
+  const core = s.meta + s.google + s.ga4;
+  return s.plano === "base" ? core : core + s.outras;
+}
+
+export function planMonthly(plan: PlanId, period: Period, billed: number): number {
+  const audio = plan === "avancado" ? AUDIO_ADDON : 0;
+  return PLAN[plan][period] + (billed - 1) * EXTRA_ACCOUNT[plan][period] + audio;
+}
+
+/** Preço de entrada do plano, com 1 conta conectada. */
+export function startingPrice(plan: PlanId, period: Period): number {
+  return planMonthly(plan, period, 1);
+}
+
+export function quote(s: PlanState): Quote {
+  const hasPlan = s.plano !== "sem";
+  const accountsTotal = s.meta + s.google + s.ga4 + s.outras;
+  const accountsAccepted = hasPlan ? acceptedAccounts(s) : 0;
+  const accountsBilled = clamp(accountsAccepted, 1, MAX_ACCOUNTS_IN_PLAN);
+  const accountsOutside = s.plano === "base" ? s.outras : 0;
+  const overLimit = hasPlan && accountsAccepted > MAX_ACCOUNTS_IN_PLAN;
+
+  const lines: QuoteLine[] = [];
+  let planMensal = 0;
+  let planAnual = 0;
+
+  if (hasPlan) {
+    const plan = s.plano as PlanId;
+    planMensal = planMonthly(plan, "mensal", accountsBilled);
+    planAnual = planMonthly(plan, "anual", accountsBilled);
+
+    lines.push({ id: "plan", label: `Plano ${PLAN_LABEL[plan]} + 1ª conta`, amount: PLAN[plan][s.periodo], kind: "monthly" });
+    const extra = accountsBilled - 1;
+    if (extra > 0) {
+      const unit = EXTRA_ACCOUNT[plan][s.periodo];
+      lines.push({
+        id: "accounts",
+        label: extra === 1 ? "1 conta a mais" : `${extra} contas a mais`,
+        detail: `${extra} × ${brl(unit)}`,
+        amount: extra * unit,
+        kind: "monthly",
+      });
+    }
+    if (plan === "avancado") {
+      lines.push({ id: "audio", label: "Análise por áudio", detail: "sem desconto no anual", amount: AUDIO_ADDON, kind: "monthly" });
+    }
+    if (plan === "pro" || plan === "avancado") {
+      lines.push({
+        id: "tracking",
+        label: "Implantação do tracking",
+        detail: `CAPI, conversões otimizadas e GA4 · juntos, valeria ${brl(PRO_TRACKING_VALUE, { decimals: false })} avulso`,
+        amount: 0,
+        kind: "included",
+      });
+    }
+  }
+
+  let oneTime = 0;
+  let extrasMonthly = 0;
+  const once = (id: string, label: string, qty: number, unit: number, detail?: string) => {
+    if (qty <= 0) return;
+    const amount = qty * unit;
+    oneTime += amount;
+    lines.push({ id, label, detail: detail ?? `${qty} × ${brl(unit)}`, qty, amount, kind: "once" });
+  };
+  const monthlyExtra = (id: string, label: string, qty: number, unit: number) => {
+    if (qty <= 0) return;
+    const amount = qty * unit;
+    extrasMonthly += amount;
+    lines.push({ id, label, detail: `${qty} × ${brl(unit)} · sem desconto no anual`, qty, amount, kind: "monthly" });
+  };
+
+  once("lp", "Landing page feita pelo time", s.lp, LP_TEAM_PRICE, `${s.lp} × ${brl(LP_TEAM_PRICE)} · já com o GTM`);
+  if (s.lpcare) monthlyExtra("lpcare", "Hospedagem e ajustes das LPs", s.lp, LP_CARE_MONTHLY);
+  if (s.sobm === "recorrente") {
+    once("sob", "Dashboard sob medida · setup", s.sob, DASH_CUSTOM.recorrente.setup);
+    monthlyExtra("sobmes", "Dashboard sob medida · mensal", s.sob, DASH_CUSTOM.recorrente.mensal);
+  } else {
+    once("sob", "Dashboard sob medida", s.sob, DASH_CUSTOM.unico);
+  }
+  once("dash", "Dashboard adicional", hasPlan ? s.dash : 0, DASH_EXTRA_PRICE);
+
+  const planMonthlyNow = s.periodo === "anual" ? planAnual : planMensal;
+  const monthly = planMonthlyNow + extrasMonthly;
+  return {
+    accountsTotal,
+    accountsAccepted,
+    accountsBilled,
+    accountsOutside,
+    overLimit,
+    planMonthly: planMonthlyNow,
+    extrasMonthly,
+    monthly,
+    monthlyMensal: planMensal + extrasMonthly,
+    monthlyAnual: planAnual + extrasMonthly,
+    yearly: (planAnual + extrasMonthly) * 12,
+    annualSaving: (planMensal - planAnual) * 12,
+    oneTime,
+    twelveMonths: monthly * 12 + oneTime,
+    lines,
+  };
+}
+
+// ---- URL ----------------------------------------------------------------
+
+const PLAN_CHOICES: PlanChoice[] = ["base", "pro", "avancado", "sem"];
+const NUM_KEYS = ["meta", "google", "ga4", "outras", "lp", "sob", "dash"] as const;
+
+export function toQuery(s: PlanState): string {
+  const p = new URLSearchParams();
+  p.set("plano", s.plano);
+  p.set("periodo", s.periodo);
+  for (const k of NUM_KEYS) p.set(k, String(s[k]));
+  p.set("sobm", s.sobm);
+  if (s.lpcare) p.set("lpcare", "1");
+  if (s.nicho) p.set("nicho", s.nicho);
+  return p.toString();
+}
+
+export function fromQuery(params: { get(key: string): string | null }): Partial<PlanState> | null {
+  if (!params.get("plano") && !params.get("periodo")) return null;
+  const out: Partial<PlanState> = {};
+  const plano = params.get("plano");
+  if (plano && (PLAN_CHOICES as string[]).includes(plano)) out.plano = plano as PlanChoice;
+  const periodo = params.get("periodo");
+  if (periodo === "mensal" || periodo === "anual") out.periodo = periodo;
+  for (const k of NUM_KEYS) {
+    const raw = params.get(k);
+    if (raw === null) continue;
+    const n = Number.parseInt(raw, 10);
+    if (Number.isNaN(n)) continue;
+    const max = k === "lp" || k === "sob" || k === "dash" ? MAX_EXTRA : MAX_PER_PLATFORM;
+    out[k] = clamp(n, 0, max);
+  }
+  const sobm = params.get("sobm");
+  if (sobm === "unico" || sobm === "recorrente") out.sobm = sobm;
+  if (params.get("lpcare") === "1") out.lpcare = true;
+  const nicho = params.get("nicho");
+  if (nicho === "ecommerce" || nicho === "imobiliario") out.nicho = nicho;
+  return out;
+}
