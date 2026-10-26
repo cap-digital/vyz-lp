@@ -5,6 +5,7 @@
 
 import { Lock, Mic, MicOff, RotateCcw, Send, Volume2, VolumeX, X } from "lucide-react";
 import Link from "next/link";
+import { m } from "motion/react";
 import { Dialog } from "radix-ui";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -148,7 +149,9 @@ export function AgentDrawer() {
           className="vyz-drawer fixed inset-0 z-[110] flex flex-col bg-card text-fg outline-none sm:inset-y-3 sm:right-3 sm:left-auto sm:w-[420px] sm:rounded-[20px] sm:border sm:border-line"
         >
           <header className="flex items-center gap-3 border-b border-line px-4 py-3">
-            <Mascot state={mascot} size={34} />
+            <m.span layoutId="vyz-mascot" transition={{ type: "spring", stiffness: 260, damping: 28 }} className="block">
+              <Mascot state={mascot} size={38} />
+            </m.span>
             <div className="min-w-0 flex-1">
               <Dialog.Title className="text-[15px] font-semibold">VYZ</Dialog.Title>
               <Dialog.Description className="truncate text-[12px] text-fg-2">{engineLabel}</Dialog.Description>

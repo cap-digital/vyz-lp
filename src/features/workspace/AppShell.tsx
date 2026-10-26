@@ -18,7 +18,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Tooltip, TooltipProvider } from "@/components/ui/Tooltip";
 import { AgentDrawer } from "@/features/agent/AgentDrawer";
-import { AgentBar, AgentButton } from "@/features/agent/AgentEntry";
+import { AgentBar, AgentFab } from "@/features/agent/AgentEntry";
 import { AgentProvider } from "@/features/agent/AgentProvider";
 import { Caption } from "@/features/agent/Caption";
 import { TIER_LABEL, TIERS, type Tier } from "@/features/pricing/entitlements";
@@ -292,12 +292,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                       <div className="hidden @[1100px]:block">
                         <AgentBar />
                       </div>
-                      <AgentButton />
                       <ThemeToggle className="size-9 shrink-0" />
                     </div>
                   </div>
                 </header>
-                <main id="conteudo" className="mx-auto max-w-[1280px] px-4 pt-6 pb-28 sm:px-6 md:pb-12 print:max-w-none print:p-0">
+                <main id="conteudo" className="mx-auto max-w-[1280px] px-4 pt-6 pb-36 sm:px-6 md:pb-28 print:max-w-none print:p-0">
                   {children}
                 </main>
               </div>
@@ -328,6 +327,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   </li>
                 </ul>
               </Modal>
+              <AgentFab />
               <AgentDrawer />
               <Caption />
             </div>

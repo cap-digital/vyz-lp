@@ -1,7 +1,8 @@
 "use client";
 
-// Pontos de entrada no topo do painel: barra "Pergunte ao VYZ… ⌘K" e o botão do mascote.
+// Pontos de entrada do painel: barra "Pergunte ao VYZ… ⌘K" no topo e o mascote flutuante.
 
+import { m } from "motion/react";
 import { useSyncExternalStore } from "react";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useAgent } from "./AgentProvider";
@@ -28,18 +29,37 @@ export function AgentBar() {
   );
 }
 
-export function AgentButton() {
-  const { setOpen, mascot } = useAgent();
+const desktopQuery = (cb: () => void) => {
+  const mq = window.matchMedia("(min-width: 768px)");
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+};
+const useDesktop = () => useSyncExternalStore(desktopQuery, () => window.matchMedia("(min-width: 768px)").matches, () => true);
+
+/**
+ * Mascote flutuante no canto inferior direito (só no painel). Ao abrir o
+ * drawer, ele "voa" até o cabeçalho (mesmo layoutId) e volta ao fechar.
+ */
+export function AgentFab() {
+  const { open, setOpen, mascot } = useAgent();
+  const desktop = useDesktop();
+  if (open) return null;
+  const size = desktop ? 64 : 56;
   return (
-    <Tooltip content="Falar com o VYZ" side="bottom">
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Abrir o assistente VYZ"
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-control border border-line outline-none transition-colors hover:border-accent focus-visible:ring-2 focus-visible:ring-accent"
-      >
-        <Mascot state={mascot} size={20} />
-      </button>
-    </Tooltip>
+    <div className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 md:right-7 md:bottom-7 print:hidden">
+      <Tooltip content="Olá, eu sou o VYZ" side="left">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Abrir o assistente VYZ"
+          className="group relative inline-flex items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--panel)]"
+          style={{ width: size, height: size }}
+        >
+          <m.span layoutId="vyz-mascot" transition={{ type: "spring", stiffness: 260, damping: 28 }} className="block">
+            <Mascot state={mascot} size={size} />
+          </m.span>
+        </button>
+      </Tooltip>
+    </div>
   );
 }
