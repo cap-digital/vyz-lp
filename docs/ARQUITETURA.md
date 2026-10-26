@@ -62,6 +62,7 @@ src/
     accounts/       plataformas, validação de IDs, tela de contas
     share/          codificação do link (base64url + deflate), PDF, relatórios
     workspace/      plano simulado, marca própria, app shell
+    agent/          assistente VYZ (só no painel): motor, drawer, mascote, voz
     marketing/      seções da LP, gerador do hero, intro
   lib/
     store/      Store, LocalStore, hooks (useCollection, useDoc)
@@ -80,8 +81,22 @@ src/
 | Páginas do dashboard | essenciais | + Pro | todas | todas |
 | Marca própria (white-label) | não | não | não | sim |
 | Análise por áudio | não | não | em breve | em breve |
+| Assistente VYZ | chat | chat | chat + voz | chat + voz |
 
 Os limites de quantidade (dashboards e LPs criadas) e as contas contratadas também vivem nesse arquivo. As contas contratadas vêm do plano simulado (padrão: 2, como na LP).
+
+## Assistente VYZ (`features/agent`)
+
+Só existe no painel: o `AgentProvider` envolve o `AppShell`, e o ESLint proíbe a LP, as páginas públicas e o `/entrar` de importar `features/agent`.
+
+- **Motor:** interface `VyzEngine.ask(pergunta, contexto) → { texto, card?, grafico?, acao?, alvo? }` (`engine/types.ts`). Hoje `LocalEngine` (`engine/local.ts`): intenções por palavra-chave em PT-BR, sem API. O ponto de troca é `engine/index.ts` (`createEngine`); um `LlmEngine` futuro chama um route handler no servidor com a mesma interface.
+- **Contexto:** `engine/context.ts` lê o `Store` (workspace, dashboards, contas, LPs) e os mesmos dados de amostra do painel (`datasetFor`), no mês até hoje contra o período anterior de mesmo tamanho. O motor só responde com o que está no contexto; sem dado, diz "não tenho esse dado".
+- **Números:** sempre pt-BR via `Intl` (`engine/format.ts`), com o período explícito ("em outubro até hoje").
+- **Ações:** trocar tema, abrir Dashboards, Landing pages, Contas, Plano e "Novo dashboard".
+- **Mostrar no painel:** cada KPI tem `data-vyz-metric`. O botão só aparece quando o KPI está na primeira página do dashboard alvo; se o usuário estiver em outra página, o painel navega até o dashboard e só então rola e destaca (`.vyz-highlight`).
+- **Entradas:** botão do mascote no topo (ao lado do tema), barra "Pergunte ao VYZ…" quando cabe, e ⌘K / Ctrl+K (único atalho com essa tecla no painel).
+- **Voz (`voice.ts`, Web Speech API, pt-BR):** só nos planos com `agentVoice` (Avançado e Personalizado), que liberam o microfone **e** a leitura em voz alta com a legenda flutuante. Nos outros, a resposta é só texto e os dois botões aparecem com cadeado, levando ao Plano. O microfone só escuta com o drawer aberto e depois do clique; "Olá, Vyz" / "Oi, Vyz" no começo da frase é aceito e retirado. Sem suporte, o microfone some.
+- **Conversa:** só na memória da aba ("limpar" zera).
 
 ## Dados e métricas
 

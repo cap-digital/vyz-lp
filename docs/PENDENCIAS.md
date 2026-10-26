@@ -16,6 +16,15 @@ O que hoje funciona só no navegador e depende de backend, de integração ou de
 | Histórico de exportações entre aparelhos | Só neste navegador | — |
 | Dashboards e LPs em outro aparelho | Só neste navegador (o link público e a prévia de LP funcionam em qualquer um) | Estado vazio explica |
 
+## Assistente VYZ
+
+| Item | Como está hoje | Aviso no produto |
+|---|---|---|
+| `LlmEngine` (respostas abertas, via route handler no servidor) | Só o `LocalEngine`: intenções por palavra-chave, sem API. O ponto de troca está pronto em `features/agent/engine/index.ts` | "Motor local · dados da demo" no drawer |
+| Persistência da conversa | Só na memória da aba; fechar a aba ou "limpar" apaga | — |
+| Reconhecimento de voz em todos os navegadores | Web Speech API: funciona no Chrome e no Edge; no Firefox e em parte do Safari o microfone some e fica o texto | — |
+| Dados reais nas respostas | Mesmos dados de amostra do painel (`datasetFor`) | "Amostra · dados fictícios" nos dashboards |
+
 ## Precisa de integração com as plataformas
 
 | Item | Como está hoje | Aviso no produto |

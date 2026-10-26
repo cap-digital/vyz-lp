@@ -24,16 +24,20 @@ export type Entitlements = {
   whiteLabel: boolean;
   audio: "none" | "soon";
   customDashboards: boolean;
+  /** Assistente VYZ no painel: chat por texto. */
+  agentChat: boolean;
+  /** Assistente VYZ por voz: microfone e leitura em voz alta. */
+  agentVoice: boolean;
   // Quantidades (provisórias, ver docs/PENDENCIAS.md)
   maxDashboards: number;
   maxLandingPages: number;
 };
 
 export const ENTITLEMENTS: Record<Tier, Entitlements> = {
-  base: { dashboardTemplates: 5, landingTemplates: 3, platforms: "core", pages: "base", whiteLabel: false, audio: "none", customDashboards: false, maxDashboards: 2, maxLandingPages: 1 },
-  pro: { dashboardTemplates: 10, landingTemplates: 6, platforms: "all", pages: "pro", whiteLabel: false, audio: "none", customDashboards: false, maxDashboards: 10, maxLandingPages: 3 },
-  avancado: { dashboardTemplates: 20, landingTemplates: 10, platforms: "all", pages: "avancado", whiteLabel: false, audio: "soon", customDashboards: false, maxDashboards: 20, maxLandingPages: 10 },
-  personalizado: { dashboardTemplates: 20, landingTemplates: 10, platforms: "all", pages: "avancado", whiteLabel: true, audio: "soon", customDashboards: true, maxDashboards: 50, maxLandingPages: 10 },
+  base: { dashboardTemplates: 5, landingTemplates: 3, platforms: "core", pages: "base", whiteLabel: false, audio: "none", customDashboards: false, agentChat: true, agentVoice: false, maxDashboards: 2, maxLandingPages: 1 },
+  pro: { dashboardTemplates: 10, landingTemplates: 6, platforms: "all", pages: "pro", whiteLabel: false, audio: "none", customDashboards: false, agentChat: true, agentVoice: false, maxDashboards: 10, maxLandingPages: 3 },
+  avancado: { dashboardTemplates: 20, landingTemplates: 10, platforms: "all", pages: "avancado", whiteLabel: false, audio: "soon", customDashboards: false, agentChat: true, agentVoice: true, maxDashboards: 20, maxLandingPages: 10 },
+  personalizado: { dashboardTemplates: 20, landingTemplates: 10, platforms: "all", pages: "avancado", whiteLabel: true, audio: "soon", customDashboards: true, agentChat: true, agentVoice: true, maxDashboards: 50, maxLandingPages: 10 },
 };
 
 /** O plano `tier` cobre o que exige `required`? */
@@ -69,6 +73,7 @@ export const LIMIT_ROWS: { label: string; value: (t: Tier) => string }[] = [
   },
   { label: "Marca própria (white-label)", value: (t) => (ENTITLEMENTS[t].whiteLabel ? "sim" : "não") },
   { label: "Análise por áudio", value: (t) => (ENTITLEMENTS[t].audio === "soon" ? "em breve" : "não") },
+  { label: "Assistente VYZ", value: (t) => (ENTITLEMENTS[t].agentVoice ? "chat + voz" : ENTITLEMENTS[t].agentChat ? "chat" : "não") },
   { label: "Dashboards", value: (t) => String(ENTITLEMENTS[t].maxDashboards) },
   { label: "Landing pages publicadas", value: (t) => String(ENTITLEMENTS[t].maxLandingPages) },
 ];

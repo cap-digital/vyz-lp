@@ -23,6 +23,23 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // A LP e as páginas públicas não carregam nada do painel nem do assistente VYZ.
+  {
+    files: ["src/app/(marketing)/**/*.{ts,tsx}", "src/features/marketing/**/*.{ts,tsx}", "src/app/(publico)/**/*.{ts,tsx}", "src/app/(auth)/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/features/agent", "@/features/agent/*", "@/features/workspace/AppShell"],
+              message: "O assistente VYZ e o app shell são só do painel.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

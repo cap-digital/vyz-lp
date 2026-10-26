@@ -18,7 +18,8 @@ function subscribe(cb: () => void) {
   };
 }
 
-function setTheme(next: Theme) {
+/** Troca o tema (também usado pelo assistente VYZ). */
+export function setTheme(next: Theme) {
   document.documentElement.setAttribute("data-theme", next);
   try {
     localStorage.setItem(KEY, next);

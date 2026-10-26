@@ -17,6 +17,10 @@ import { Menu as DropMenu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } f
 import { Segmented } from "@/components/ui/Segmented";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Tooltip, TooltipProvider } from "@/components/ui/Tooltip";
+import { AgentDrawer } from "@/features/agent/AgentDrawer";
+import { AgentBar, AgentButton } from "@/features/agent/AgentEntry";
+import { AgentProvider } from "@/features/agent/AgentProvider";
+import { Caption } from "@/features/agent/Caption";
 import { TIER_LABEL, TIERS, type Tier } from "@/features/pricing/entitlements";
 import { useWorkspace } from "./workspace";
 
@@ -267,57 +271,67 @@ export function AppShell({ children }: { children: ReactNode }) {
     <LazyMotion features={loadFeatures} strict>
       <MotionConfig reducedMotion="user">
         <TooltipProvider>
-          <div className="min-h-dvh bg-[var(--sidebar)] md:flex md:h-dvh md:overflow-hidden print:block print:h-auto print:bg-white">
-            <Sidebar />
+          <AgentProvider>
+            <div className="min-h-dvh bg-[var(--sidebar)] md:flex md:h-dvh md:overflow-hidden print:block print:h-auto print:bg-white">
+              <Sidebar />
 
-            <div className="min-h-dvh min-w-0 flex-1 bg-[var(--panel)] md:my-3 md:mr-3 md:h-[calc(100dvh-24px)] md:min-h-0 md:overflow-y-auto md:rounded-[24px] print:m-0 print:h-auto print:overflow-visible print:rounded-none print:bg-white">
-              <header className="@container sticky top-0 z-30 border-b border-line bg-[color-mix(in_srgb,var(--panel)_82%,transparent)] backdrop-blur-md print:hidden">
-                <div className="flex h-14 items-center justify-between gap-3 px-4 sm:px-6">
-                  <Link href="/painel" aria-label="VYZ, início do painel" className="block w-14 md:hidden">
-                    <Wordmark decorative />
-                  </Link>
-                  <div className="flex min-w-0 items-center gap-3">
-                    <DemoChip />
-                    {/* o simulador só entra no topo quando cabe numa linha (está também em Plano) */}
-                    <div className="hidden @[860px]:block">
-                      <PlanSimulator compact />
+              <div className="min-h-dvh min-w-0 flex-1 bg-[var(--panel)] md:my-3 md:mr-3 md:h-[calc(100dvh-24px)] md:min-h-0 md:overflow-y-auto md:rounded-[24px] print:m-0 print:h-auto print:overflow-visible print:rounded-none print:bg-white">
+                <header className="@container sticky top-0 z-30 border-b border-line bg-[color-mix(in_srgb,var(--panel)_82%,transparent)] backdrop-blur-md print:hidden">
+                  <div className="flex h-14 items-center justify-between gap-3 px-4 sm:px-6">
+                    <Link href="/painel" aria-label="VYZ, início do painel" className="block w-14 md:hidden">
+                      <Wordmark decorative />
+                    </Link>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <DemoChip />
+                      {/* o simulador só entra no topo quando cabe numa linha (está também em Plano) */}
+                      <div className="hidden @[860px]:block">
+                        <PlanSimulator compact />
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <div className="hidden @[1100px]:block">
+                        <AgentBar />
+                      </div>
+                      <AgentButton />
+                      <ThemeToggle className="size-9 shrink-0" />
                     </div>
                   </div>
-                  <ThemeToggle className="size-9 shrink-0" />
-                </div>
-              </header>
-              <main id="conteudo" className="mx-auto max-w-[1280px] px-4 pt-6 pb-28 sm:px-6 md:pb-12 print:max-w-none print:p-0">
-                {children}
-              </main>
-            </div>
+                </header>
+                <main id="conteudo" className="mx-auto max-w-[1280px] px-4 pt-6 pb-28 sm:px-6 md:pb-12 print:max-w-none print:p-0">
+                  {children}
+                </main>
+              </div>
 
-            <nav aria-label="Seções" className="fixed inset-x-0 bottom-0 z-40 bg-[var(--sidebar)] md:hidden print:hidden">
-              <Suspense fallback={<BottomNav path={null} onMore={() => setMore(true)} />}>
-                <ActiveBottomNav onMore={() => setMore(true)} />
-              </Suspense>
-            </nav>
-            <Modal open={more} onClose={() => setMore(false)} title="Mais">
-              <ul className="space-y-1" onClick={() => setMore(false)}>
-                {NAV.slice(4).map(({ href, label, icon: I }) => (
-                  <li key={href}>
-                    <Link href={href} className="flex items-center gap-3 rounded-control px-3 py-3 text-[15px] hover:bg-accent-soft">
-                      <I size={18} aria-hidden /> {label}
+              <nav aria-label="Seções" className="fixed inset-x-0 bottom-0 z-40 bg-[var(--sidebar)] md:hidden print:hidden">
+                <Suspense fallback={<BottomNav path={null} onMore={() => setMore(true)} />}>
+                  <ActiveBottomNav onMore={() => setMore(true)} />
+                </Suspense>
+              </nav>
+              <Modal open={more} onClose={() => setMore(false)} title="Mais">
+                <ul className="space-y-1" onClick={() => setMore(false)}>
+                  {NAV.slice(4).map(({ href, label, icon: I }) => (
+                    <li key={href}>
+                      <Link href={href} className="flex items-center gap-3 rounded-control px-3 py-3 text-[15px] hover:bg-accent-soft">
+                        <I size={18} aria-hidden /> {label}
+                      </Link>
+                    </li>
+                  ))}
+                  <li>
+                    <Link href="/" className="flex items-center gap-3 rounded-control px-3 py-3 text-[15px] text-fg-2 hover:bg-accent-soft">
+                      Voltar ao site
                     </Link>
                   </li>
-                ))}
-                <li>
-                  <Link href="/" className="flex items-center gap-3 rounded-control px-3 py-3 text-[15px] text-fg-2 hover:bg-accent-soft">
-                    Voltar ao site
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/entrar" className="flex items-center gap-3 rounded-control px-3 py-3 text-[15px] text-fg-2 hover:bg-accent-soft">
-                    <LogOut size={18} aria-hidden /> Sair
-                  </Link>
-                </li>
-              </ul>
-            </Modal>
-          </div>
+                  <li>
+                    <Link href="/entrar" className="flex items-center gap-3 rounded-control px-3 py-3 text-[15px] text-fg-2 hover:bg-accent-soft">
+                      <LogOut size={18} aria-hidden /> Sair
+                    </Link>
+                  </li>
+                </ul>
+              </Modal>
+              <AgentDrawer />
+              <Caption />
+            </div>
+          </AgentProvider>
         </TooltipProvider>
       </MotionConfig>
     </LazyMotion>

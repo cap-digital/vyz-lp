@@ -101,6 +101,7 @@ export function Kpi({ spec, ctx, delay, size = "md" }: { spec: KpiSpec; ctx: Wid
 
   return (
     <div
+      data-vyz-metric={spec.metric}
       className={`m-in min-w-0 rounded-[10px] border ${lg ? "p-3.5" : "p-2.5"} ${strong ? "border-transparent bg-accent text-on-accent" : "border-line bg-card"}`}
       style={{ "--d": `${delay}ms` } as CSSProperties}
       title={def.help}
