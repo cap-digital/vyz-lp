@@ -8,12 +8,15 @@
 // prefers-reduced-motion fica tudo parado.
 
 import { useEffect, useId, useRef } from "react";
-import { V_BOTTOM, V_TOP } from "@/components/brand/geometry";
 
 export type MascotState = "idle" | "listening" | "thinking" | "speaking";
 
-/** O V do logo (10 × 10) vira um rosto de 40 unidades, um pouco abaixo do centro da esfera. */
-const FACE = { scale: 4, x: 30, y: 33 };
+// Rosto em unidades do desenho (esfera de 100). Os olhos são os braços de
+// cima do V com menos inclinação (nada de sobrancelha franzida); a boca é a
+// base do V bem fina, mais larga em cima e com os cantos para cima.
+const EYE_L = "33,37.5 44,37.5 45.4,46.5 34.4,46.5";
+const EYE_R = "67,37.5 56,37.5 54.6,46.5 65.6,46.5";
+const MOUTH = "M37.5,56 Q50,60.5 62.5,56 L60.6,60 Q50,64.2 39.4,60 Z";
 /** Quanto o rosto anda na direção do cursor (unidades do desenho de 100). */
 const LOOK = 4;
 
@@ -56,7 +59,6 @@ export function Mascot({ state = "idle", size = 32, className = "" }: { state?: 
   }, []);
 
   const g = (n: string) => `${n}-${id}`;
-  const face = `translate(${FACE.x} ${FACE.y}) scale(${FACE.scale})`;
   return (
     <span ref={root} aria-hidden data-state={state} className={`vyz3d ${className}`} style={{ width: size, height: size }}>
       <span className="vyz3d-halo" />
@@ -100,19 +102,14 @@ export function Mascot({ state = "idle", size = 32, className = "" }: { state?: 
           </g>
           <circle cx="50" cy="50" r="43.2" fill="none" stroke={`url(#${g("rim")})`} strokeWidth="1.6" />
 
-          {/* rosto: o logo V desmontado */}
+          {/* rosto: o V do logo desmontado e suavizado (olhos = braços de cima, boca = base, em sorriso) */}
           <g className="vyz3d-face">
-            <g className="vyz3d-look" fill="#F3F0E2">
-              <g className="vyz3d-eyes">
-                {V_TOP.map((p) => (
-                  <polygon key={p} points={p} transform={face} />
-                ))}
+            <g className="vyz3d-look" fill="#F3F0E2" stroke="#F3F0E2" strokeLinejoin="round" strokeLinecap="round">
+              <g className="vyz3d-eyes" strokeWidth="2.6">
+                <polygon points={EYE_L} />
+                <polygon points={EYE_R} />
               </g>
-              <g className="vyz3d-mouth">
-                {V_BOTTOM.map((p) => (
-                  <polygon key={p} points={p} transform={face} />
-                ))}
-              </g>
+              <path className="vyz3d-mouth" d={MOUTH} strokeWidth="1.8" />
             </g>
           </g>
         </svg>
