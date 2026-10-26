@@ -934,10 +934,37 @@ button:hover > * > .vyz3d .vyz3d-mouth { transform: scale(1.2, 1.12); }
   from { transform: scale(1, 1); }
   to { transform: scale(0.92, 2.3); }
 }
+/* giro: só a superfície gira (rosto ↔ V); x = R·sen θ e largura = cos θ, com
+   θ já em ease-in-out (0°, 11°, 45°, 79°, 90°), R = 40 */
+.vyz3d .vyz3d-surf { transform-box: view-box; transform-origin: 50px 50px; }
+.vyz3d .vyz3d-surf-logo { opacity: 0; }
+.vyz3d[data-side="logo"] .vyz3d-surf-face { opacity: 0; }
+.vyz3d[data-side="logo"] .vyz3d-surf-logo { opacity: 1; }
+.vyz3d[data-side="to-logo"] .vyz3d-surf-face,
+.vyz3d[data-side="to-face"] .vyz3d-surf-logo { animation: vyz-surf-out 900ms linear forwards; }
+.vyz3d[data-side="to-logo"] .vyz3d-surf-logo,
+.vyz3d[data-side="to-face"] .vyz3d-surf-face { animation: vyz-surf-in 900ms linear forwards; }
+@keyframes vyz-surf-out {
+  0% { transform: translateX(0) scaleX(1); opacity: 1; }
+  25% { transform: translateX(7.8px) scaleX(0.981); }
+  50% { transform: translateX(28.3px) scaleX(0.707); }
+  75% { transform: translateX(39.2px) scaleX(0.195); opacity: 1; }
+  100% { transform: translateX(40px) scaleX(0); opacity: 0; }
+}
+@keyframes vyz-surf-in {
+  0% { transform: translateX(-40px) scaleX(0); opacity: 0; }
+  25% { transform: translateX(-39.2px) scaleX(0.195); opacity: 1; }
+  50% { transform: translateX(-28.3px) scaleX(0.707); }
+  75% { transform: translateX(-7.8px) scaleX(0.981); }
+  100% { transform: translateX(0) scaleX(1); opacity: 1; }
+}
 @media (prefers-reduced-motion: reduce) {
   .vyz3d *,
   .vyz3d { animation: none !important; transition: none !important; }
   .vyz3d .vyz3d-face, .vyz3d .vyz3d-spec { transform: none !important; }
+  /* sem giro: só o rosto, já no primeiro quadro (antes da hidratação) */
+  .vyz3d .vyz3d-surf-face { opacity: 1 !important; transform: none !important; }
+  .vyz3d .vyz3d-surf-logo { opacity: 0 !important; }
 }
 .vyz-highlight {
   animation: vyz-glow 2s cubic-bezier(0.22, 1, 0.36, 1);

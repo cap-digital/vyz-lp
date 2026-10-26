@@ -56,7 +56,7 @@ export function AgentFab() {
           style={{ width: size, height: size }}
         >
           <m.span layoutId="vyz-mascot" transition={{ type: "spring", stiffness: 260, damping: 28 }} className="block">
-            <Mascot state={mascot} size={size} />
+            <Mascot state={mascot} size={size} spins />
           </m.span>
         </button>
       </Tooltip>
