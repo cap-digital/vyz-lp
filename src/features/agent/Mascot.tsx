@@ -1,20 +1,21 @@
 "use client";
 
-// Mascote do VYZ: o V cortado da marca com volume (luz do alto à esquerda,
-// chanfro, brilho especular, sombra interna), dois olhos que seguem o cursor
-// de leve, halo na cor da marca e sombra projetada separada. Um componente só:
-// botão flutuante, drawer e barra do topo. Estados e animações no CSS
-// (.vyz3d em globals.css); com prefers-reduced-motion fica tudo parado.
+// Mascote do VYZ: uma esfera brilhante com o rosto feito do próprio logo — os
+// dois braços de cima do V são os olhos e a base é a boca. A luz vem do alto
+// à esquerda; o rosto desliza na direção do cursor e o brilho especular anda
+// ao contrário (sensação de volume). Um componente só: botão flutuante,
+// drawer e barra do topo. Estados no CSS (.vyz3d em globals.css); com
+// prefers-reduced-motion fica tudo parado.
 
 import { useEffect, useId, useRef } from "react";
 import { V_BOTTOM, V_TOP } from "@/components/brand/geometry";
 
 export type MascotState = "idle" | "listening" | "thinking" | "speaking";
 
-const POLYS = [...V_TOP, ...V_BOTTOM];
-const EYES = [1.95, 8.05];
-/** Quanto a pupila anda, em unidades do desenho (o V tem 10). */
-const LOOK = 0.32;
+/** O V do logo (10 × 10) vira um rosto de 40 unidades, um pouco abaixo do centro da esfera. */
+const FACE = { scale: 4, x: 30, y: 33 };
+/** Quanto o rosto anda na direção do cursor (unidades do desenho de 100). */
+const LOOK = 4;
 
 const still = () => typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -22,7 +23,7 @@ export function Mascot({ state = "idle", size = 32, className = "" }: { state?: 
   const id = useId().replace(/:/g, "");
   const root = useRef<HTMLSpanElement>(null);
 
-  // pupilas seguem o cursor (CSS vars, sem re-render) e o hover inclina em 3D
+  // o rosto segue o cursor e o brilho vai ao contrário (CSS vars, sem re-render)
   useEffect(() => {
     const el = root.current;
     if (!el || still()) return;
@@ -32,104 +33,89 @@ export function Mascot({ state = "idle", size = 32, className = "" }: { state?: 
       raf = 0;
       if (!last) return;
       const r = el.getBoundingClientRect();
-      const cx = r.left + r.width / 2;
-      const cy = r.top + r.height / 2;
-      const dx = last.clientX - cx;
-      const dy = last.clientY - cy;
+      const dx = last.clientX - (r.left + r.width / 2);
+      const dy = last.clientY - (r.top + r.height / 2);
       const d = Math.hypot(dx, dy) || 1;
-      const k = Math.min(1, d / 240);
-      el.style.setProperty("--look-x", `${((dx / d) * LOOK * k).toFixed(3)}px`);
-      el.style.setProperty("--look-y", `${((dy / d) * LOOK * k).toFixed(3)}px`);
-      if (el.matches(":hover")) {
-        el.style.setProperty("--tilt-x", `${(-dy / r.height) * 18}deg`);
-        el.style.setProperty("--tilt-y", `${(dx / r.width) * 18}deg`);
-      }
+      const k = Math.min(1, d / 260);
+      const x = (dx / d) * LOOK * k;
+      const y = (dy / d) * LOOK * k;
+      el.style.setProperty("--face-x", `${x.toFixed(2)}px`);
+      el.style.setProperty("--face-y", `${y.toFixed(2)}px`);
+      el.style.setProperty("--spec-x", `${(-x * 0.6).toFixed(2)}px`);
+      el.style.setProperty("--spec-y", `${(-y * 0.6).toFixed(2)}px`);
     };
     const onMove = (e: PointerEvent) => {
       last = e;
       if (!raf) raf = requestAnimationFrame(apply);
     };
-    const onLeave = () => {
-      el.style.setProperty("--tilt-x", "0deg");
-      el.style.setProperty("--tilt-y", "0deg");
-    };
     window.addEventListener("pointermove", onMove, { passive: true });
-    el.addEventListener("pointerleave", onLeave);
     return () => {
       window.removeEventListener("pointermove", onMove);
-      el.removeEventListener("pointerleave", onLeave);
       cancelAnimationFrame(raf);
     };
   }, []);
 
   const g = (n: string) => `${n}-${id}`;
+  const face = `translate(${FACE.x} ${FACE.y}) scale(${FACE.scale})`;
   return (
     <span ref={root} aria-hidden data-state={state} className={`vyz3d ${className}`} style={{ width: size, height: size }}>
       <span className="vyz3d-halo" />
       <span className="vyz3d-shadow" />
       <span className="vyz3d-float">
-        <span className="vyz3d-tilt">
-          <svg viewBox="-1.2 -1.2 12.4 12.4" width={size} height={size} className="block overflow-visible">
-            <defs>
-              {/* face: luz do alto à esquerda */}
-              <linearGradient id={g("face")} x1="0" y1="0" x2="0.85" y2="1">
-                <stop offset="0" stopColor="#C3D08F" />
-                <stop offset="0.38" stopColor="#8A9A5B" />
-                <stop offset="1" stopColor="#4B5320" />
-              </linearGradient>
-              {/* lateral do chanfro, mais escura */}
-              <linearGradient id={g("side")} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#3A4219" />
-                <stop offset="1" stopColor="#1F2612" />
-              </linearGradient>
-              {/* brilho especular no topo */}
-              <radialGradient id={g("spec")} cx="0.28" cy="0.08" r="0.55">
-                <stop offset="0" stopColor="#fff" stopOpacity="0.85" />
-                <stop offset="0.45" stopColor="#fff" stopOpacity="0.18" />
-                <stop offset="1" stopColor="#fff" stopOpacity="0" />
-              </radialGradient>
-              {/* sombra interna embaixo */}
-              <linearGradient id={g("inner")} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0.55" stopColor="#1F2612" stopOpacity="0" />
-                <stop offset="1" stopColor="#1F2612" stopOpacity="0.45" />
-              </linearGradient>
-              <clipPath id={g("clip")}>
-                {POLYS.map((p) => (
-                  <polygon key={p} points={p} />
-                ))}
-              </clipPath>
-            </defs>
+        <svg viewBox="0 0 100 100" width={size} height={size} className="block overflow-visible">
+          <defs>
+            {/* corpo: luz do alto à esquerda, oliva claro → oliva escuro */}
+            <radialGradient id={g("body")} cx="0.34" cy="0.28" r="0.78">
+              <stop offset="0" stopColor="#B9C48F" />
+              <stop offset="0.38" stopColor="#8A9A5B" />
+              <stop offset="0.78" stopColor="#4B5320" />
+              <stop offset="1" stopColor="#2F3621" />
+            </radialGradient>
+            {/* sombra interna na base */}
+            <radialGradient id={g("inner")} cx="0.55" cy="1.05" r="0.6">
+              <stop offset="0" stopColor="#1F2612" stopOpacity="0.55" />
+              <stop offset="1" stopColor="#1F2612" stopOpacity="0" />
+            </radialGradient>
+            {/* luz de borda fina embaixo */}
+            <linearGradient id={g("rim")} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0.62" stopColor="#D7DCC3" stopOpacity="0" />
+              <stop offset="1" stopColor="#D7DCC3" stopOpacity="0.75" />
+            </linearGradient>
+            <filter id={g("blur")} x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2.4" />
+            </filter>
+            <clipPath id={g("clip")}>
+              <circle cx="50" cy="50" r="44" />
+            </clipPath>
+          </defs>
 
-            <g className="vyz3d-body">
-              {/* lateral (o chanfro aparece embaixo e à direita) */}
-              <g fill={`url(#${g("side")})`} transform="translate(0.32 0.42)">
-                {POLYS.map((p) => (
-                  <polygon key={p} points={p} />
-                ))}
-              </g>
-              {/* face */}
-              <g fill={`url(#${g("face")})`} stroke="#D7DCC3" strokeOpacity="0.55" strokeWidth="0.12" strokeLinejoin="round">
-                {POLYS.map((p) => (
-                  <polygon key={p} points={p} />
-                ))}
-              </g>
-              <g clipPath={`url(#${g("clip")})`}>
-                <rect x="-1" y="-1" width="12" height="12" fill={`url(#${g("inner")})`} />
-                <ellipse cx="2.6" cy="0.6" rx="4.4" ry="2.6" fill={`url(#${g("spec")})`} />
-              </g>
-
-              {EYES.map((cx) => (
-                <g key={cx} className="vyz3d-eye" style={{ transformOrigin: `${cx}px 1.85px` }}>
-                  <ellipse cx={cx} cy="1.85" rx="1.02" ry="1.22" fill="#FBFCF8" stroke="#1F2612" strokeOpacity="0.25" strokeWidth="0.08" />
-                  <g className="vyz3d-pupil">
-                    <ellipse cx={cx} cy="1.95" rx="0.5" ry="0.58" fill="#1E1E1E" />
-                    <circle cx={cx - 0.17} cy="1.73" r="0.16" fill="#fff" />
-                  </g>
-                </g>
-              ))}
+          <circle cx="50" cy="50" r="44" fill={`url(#${g("body")})`} />
+          <g clipPath={`url(#${g("clip")})`}>
+            <rect x="0" y="0" width="100" height="100" fill={`url(#${g("inner")})`} />
+            {/* brilho especular: anda ao contrário do rosto */}
+            <g className="vyz3d-spec">
+              <ellipse cx="34" cy="24" rx="17" ry="10" transform="rotate(-28 34 24)" fill="#fff" opacity="0.55" filter={`url(#${g("blur")})`} />
+              <ellipse cx="30" cy="21" rx="5" ry="3" transform="rotate(-28 30 21)" fill="#fff" opacity="0.7" />
             </g>
-          </svg>
-        </span>
+          </g>
+          <circle cx="50" cy="50" r="43.2" fill="none" stroke={`url(#${g("rim")})`} strokeWidth="1.6" />
+
+          {/* rosto: o logo V desmontado */}
+          <g className="vyz3d-face">
+            <g className="vyz3d-look" fill="#F3F0E2">
+              <g className="vyz3d-eyes">
+                {V_TOP.map((p) => (
+                  <polygon key={p} points={p} transform={face} />
+                ))}
+              </g>
+              <g className="vyz3d-mouth">
+                {V_BOTTOM.map((p) => (
+                  <polygon key={p} points={p} transform={face} />
+                ))}
+              </g>
+            </g>
+          </g>
+        </svg>
       </span>
     </span>
   );
