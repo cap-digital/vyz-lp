@@ -59,9 +59,24 @@ export type ServerEnv = z.infer<typeof Schema>;
 
 let cached: ServerEnv | null = null;
 
+// Nomes alternativos aceitos (usados no handoff e na Vercel): o nome oficial
+// vence quando os dois existem.
+const ALIASES: Record<string, string> = {
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  REVENUECAT_WEBHOOK_SECRET: "REVENUECAT_WEBHOOK_AUTH",
+};
+
+function withAliases(env: NodeJS.ProcessEnv) {
+  const out: Record<string, string | undefined> = { ...env };
+  for (const [name, alias] of Object.entries(ALIASES)) {
+    if (!out[name]?.trim() && out[alias]?.trim()) out[name] = out[alias];
+  }
+  return out;
+}
+
 export function serverEnv(): ServerEnv {
   if (cached) return cached;
-  const parsed = Schema.safeParse(process.env);
+  const parsed = Schema.safeParse(withAliases(process.env));
   if (!parsed.success) {
     throw new Error(`Variáveis de ambiente inválidas:\n${parsed.error.issues.map((i) => `- ${i.path.join(".") || "env"}: ${i.message}`).join("\n")}`);
   }
