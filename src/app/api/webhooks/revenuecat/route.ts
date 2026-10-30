@@ -26,10 +26,14 @@ const Event = z.object({
 
 const STORE: Record<string, "app_store" | "play_store"> = { APP_STORE: "app_store", PLAY_STORE: "play_store" };
 
+// O segredo pode estar salvo com ou sem "Bearer " (no painel do RevenueCat e
+// na Vercel): compara só o valor.
+const bare = (v: string) => v.trim().replace(/^bearer\s+/i, "");
+
 function authorized(header: string | null, secret: string) {
-  const a = Buffer.from(header ?? "");
-  const b = Buffer.from(secret);
-  return a.length === b.length && timingSafeEqual(a, b);
+  const a = Buffer.from(bare(header ?? ""));
+  const b = Buffer.from(bare(secret));
+  return b.length > 0 && a.length === b.length && timingSafeEqual(a, b);
 }
 
 export async function POST(request: Request) {
@@ -69,7 +73,9 @@ export async function POST(request: Request) {
   }
 
   const credits = e.product_id ? creditsFor(e.product_id) : null;
-  const isPurchase = e.type === "NON_RENEWING_PURCHASE" || e.type === "INITIAL_PURCHASE";
+  // TEST (botão "Send test event" do RevenueCat) credita só se vier com um
+  // produto de crédito, um usuário real e uma transação; o teste padrão só confirma o 200.
+  const isPurchase = e.type === "NON_RENEWING_PURCHASE" || e.type === "INITIAL_PURCHASE" || e.type === "TEST";
   const isRefund = e.type === "CANCELLATION" && raw?.event?.cancel_reason === "CUSTOMER_SUPPORT";
   if (credits && userId && e.transaction_id && (isPurchase || isRefund)) {
     const { error } = await admin.rpc("credit_store_purchase", {
