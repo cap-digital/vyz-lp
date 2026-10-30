@@ -16,11 +16,13 @@ const Event = z.object({
   event: z.object({
     id: z.string().min(1),
     type: z.string(),
-    app_user_id: z.string().optional(),
-    product_id: z.string().optional(),
+    // O RevenueCat manda null em vários campos (o evento TEST, por exemplo):
+    // null vira ausente.
+    app_user_id: z.string().nullish().transform((v) => v ?? undefined),
+    product_id: z.string().nullish().transform((v) => v ?? undefined),
     new_product_id: z.string().nullish(),
-    transaction_id: z.string().optional(),
-    store: z.string().optional(),
+    transaction_id: z.string().nullish().transform((v) => v ?? undefined),
+    store: z.string().nullish().transform((v) => v ?? undefined),
   }),
 });
 
