@@ -1,37 +1,53 @@
 "use client";
 
+// Workspace aberto no painel, no formato que os componentes já usavam
+// ({ ws, ent, update }). Os dados vêm da sessão montada no servidor
+// (WorkspaceProvider); update() grava pelo servidor e re-renderiza a rota.
+
 import { useCallback } from "react";
 import { ENTITLEMENTS, type Tier } from "@/features/pricing/entitlements";
-import { useDoc } from "@/lib/store/hooks";
-import { store } from "@/lib/store/store";
+import { updateWorkspace } from "@/server/workspace/actions";
+import { useOptionalWorkspaceSession } from "./WorkspaceProvider";
 
 export type Brand = { logo?: string; color: string; hideVyz: boolean };
 
 export type Workspace = {
   name: string;
   userName: string;
-  /** Plano simulado (o real virá da conta, com o Supabase). */
+  /** Plano vigente (sem assinatura ativa, vale o Base para os bloqueios). */
   tier: Tier;
   /** Contas contratadas (entram no limite). */
   contractedAccounts: number;
-  /** Marca própria (só no Personalizado). */
   brand: Brand;
 };
 
 export const DEFAULT_WORKSPACE: Workspace = {
   name: "Minha agência",
   userName: "",
-  tier: "pro",
-  contractedAccounts: 2,
+  tier: "base",
+  contractedAccounts: 1,
   brand: { color: "#4B5320", hideVyz: false },
 };
 
 export function useWorkspace() {
-  const saved = useDoc<Workspace>("workspace");
-  const ws: Workspace = { ...DEFAULT_WORKSPACE, ...saved, brand: { ...DEFAULT_WORKSPACE.brand, ...saved?.brand } };
-  const update = useCallback((patch: Partial<Workspace>) => {
-    const cur = store.getDoc<Workspace>("workspace") ?? DEFAULT_WORKSPACE;
-    store.setDoc("workspace", { ...DEFAULT_WORKSPACE, ...cur, ...patch });
+  const session = useOptionalWorkspaceSession();
+  const ws: Workspace = session
+    ? {
+        name: session.workspace.name,
+        userName: session.user.fullName,
+        tier: session.access.tier ?? "base",
+        contractedAccounts: session.access.accountsQuantity,
+        brand: { logo: session.workspace.brandLogoUrl ?? undefined, color: session.workspace.brandColor, hideVyz: session.workspace.hideVyzBrand },
+      }
+    : DEFAULT_WORKSPACE;
+
+  const update = useCallback(async (patch: Partial<Workspace>) => {
+    return updateWorkspace({
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.brand?.color !== undefined ? { brandColor: patch.brand.color } : {}),
+      ...(patch.brand?.hideVyz !== undefined ? { hideVyzBrand: patch.brand.hideVyz } : {}),
+    });
   }, []);
-  return { ws, update, ent: ENTITLEMENTS[ws.tier] };
+
+  return { ws, update, ent: session?.access.entitlements ?? ENTITLEMENTS[ws.tier], session };
 }

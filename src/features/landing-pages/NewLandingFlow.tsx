@@ -1,31 +1,24 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { PendingChip } from "@/components/ui/kit";
 import { btn } from "@/components/ui/styles";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { TIER_LABEL } from "@/features/pricing/entitlements";
-import { encodeData } from "@/features/share/encode";
 import { landingDefaults, landingTemplate } from "@/features/templates/landing-pages";
-import type { LandingDraft, LandingPage, Tracking } from "@/features/workspace/types";
+import type { LandingDraft } from "@/features/workspace/types";
 import { useWorkspace } from "@/features/workspace/workspace";
-import { newId, slugify } from "@/lib/ids";
-import { useCollection, useDoc } from "@/lib/store/hooks";
+import { useDoc } from "@/lib/store/hooks";
 import { store } from "@/lib/store/store";
 import { msgUpgrade, waLink } from "@/lib/whatsapp";
+import { createLandingPage } from "@/server/landing-pages/actions";
 import { ContentFields, LandingPreview, SlugField, TrackingFields, trackingValid, useHideBadge } from "./editor";
 import { LandingGallery } from "./LandingGallery";
+import { EMPTY_TRACKING, slugFromBrand, slugIssue } from "./model";
 
 const STEPS = ["Template", "Conteúdo", "Rastreamento", "Publicar"];
-export const EMPTY_TRACKING: Tracking = { gtm: "", pixel: "", adsConversion: "", ga4: "" };
-
-/** Abre a prévia pública (/p/[id]#conteúdo), que funciona em qualquer navegador. */
-export async function previewUrl(lp: Pick<LandingPage, "id" | "templateId" | "content">): Promise<string> {
-  const code = await encodeData({ t: lp.templateId, c: lp.content });
-  return `${window.location.origin}/p/${lp.id}#${code}`;
-}
 
 function Steps({ step, max, onGo }: { step: number; max: number; onGo: (s: number) => void }) {
   return (
@@ -57,14 +50,19 @@ function Split({ left, right }: { left: ReactNode; right: ReactNode }) {
   );
 }
 
-export function NewLandingFlow() {
+/**
+ * Fluxo "Nova landing page". O rascunho fica neste navegador a cada passo; no
+ * último, a página é criada no servidor (e publicada, se o plano deixar) e
+ * segue para o editor.
+ */
+export function NewLandingFlow({ publishedCount, limit }: { publishedCount: number; limit: number }) {
   const router = useRouter();
   const params = useSearchParams();
-  const { ws, ent } = useWorkspace();
+  const { ws } = useWorkspace();
   const hideBadge = useHideBadge();
   const saved = useDoc<LandingDraft>("draft:landing");
-  const pages = useCollection<LandingPage>("landingPages");
-  const [published, setPublished] = useState<LandingPage | null>(null);
+  const [error, setError] = useState<{ text: string; slug?: string } | null>(null);
+  const [creating, startCreate] = useTransition();
   const handled = useRef(false);
 
   useEffect(() => {
@@ -79,42 +77,27 @@ export function NewLandingFlow() {
   const step = t && draft.content ? draft.step : 1;
   const content = draft.content;
   const tracking = draft.tracking ?? EMPTY_TRACKING;
-  const publishedCount = pages.filter((p) => p.published).length;
-  const atLimit = publishedCount >= ent.maxLandingPages;
+  const slug = draft.slug ?? "";
+  const atLimit = publishedCount >= limit;
+  const slugError = slug ? slugIssue(slug) : "Escolha um endereço.";
 
-  function persist(publish: boolean): LandingPage | null {
-    if (!t || !content) return null;
-    const now = new Date().toISOString();
-    const lp: LandingPage = {
-      id: draft.id ?? newId("lp_"),
-      templateId: t.id,
-      content,
-      tracking,
-      slug: draft.slug || slugify(content.brand, "-"),
-      published: publish,
-      createdAt: draft.createdAt ?? now,
-      updatedAt: now,
-    };
-    store.put("landingPages", lp);
-    store.setDoc("draft:landing", null);
-    return lp;
-  }
-
-  if (published) {
-    return (
-      <div className="space-y-4 rounded-card border border-line bg-card p-6">
-        <h2 className="title text-xl">Pronto: {published.content.brand} está no preview.</h2>
-        <PendingChip label="Publicação precisa de hospedagem" detail="Por enquanto, a página existe só como preview em /p/[id]. Com a hospedagem, ela vai para o subdomínio escolhido." />
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={btn.small} onClick={async () => window.open(await previewUrl(published), "_blank", "noopener")}>
-            <ExternalLink size={15} aria-hidden /> Abrir preview
-          </button>
-          <button type="button" className={`${btn.ghost} h-9`} onClick={() => router.push(`/painel/landing-pages/${published.id}`)}>
-            Abrir no editor
-          </button>
-        </div>
-      </div>
-    );
+  function create(publish: boolean) {
+    if (!t || !content) return;
+    setError(null);
+    startCreate(async () => {
+      const { logo, ...rest } = content;
+      const r = await createLandingPage({ templateId: t.id, content: rest, tracking, slug, publish, logoDataUrl: logo?.startsWith("data:") ? logo : undefined });
+      if (!r.ok) {
+        setError({ text: r.error.message, slug: r.error.code === "landing:slug_taken" ? r.error.fields?.slug || undefined : undefined });
+        return;
+      }
+      store.setDoc("draft:landing", null);
+      // O editor explica o que não deu certo (publicação recusada pelo plano, logo).
+      const notes = new URLSearchParams();
+      if (r.data.publishError) notes.set("aviso", r.data.publishError.code === "limit:landing_pages" ? "limite" : "rascunho");
+      if (r.data.logoError) notes.set("logo", "falhou");
+      router.push(`/painel/landing-pages/${r.data.id}${notes.size ? `?${notes}` : ""}`);
+    });
   }
 
   return (
@@ -126,7 +109,7 @@ export function NewLandingFlow() {
           onUse={(id) => {
             const tt = landingTemplate(id)!;
             const c = landingDefaults(tt, ws.name || "Sua marca");
-            save({ templateId: id, content: c, tracking: EMPTY_TRACKING, slug: slugify(c.brand, "-"), step: 2 });
+            save({ templateId: id, content: c, tracking: EMPTY_TRACKING, slug: slugFromBrand(c.brand), step: 2 });
           }}
         />
       )}
@@ -151,15 +134,18 @@ export function NewLandingFlow() {
           left={
             <div className="space-y-4">
               <h2 className="title text-lg">Publicar</h2>
-              <SlugField value={draft.slug ?? ""} onChange={(slug) => save({ slug })} />
-              <p className="text-[13px] text-fg-2 tnum">
-                Endereço: <strong className="text-fg">{draft.slug || "sua-marca"}.vyz.app</strong>
-              </p>
-              <PendingChip label="Publicação precisa de hospedagem" detail="Por enquanto, só o preview em /p/[id]." />
+              <SlugField value={slug} onChange={(v) => save({ slug: v })} error={slug && slugError ? slugError : null} />
+              {error?.slug && (
+                <button type="button" className={`${btn.ghost} h-8 px-2 text-[13px]`} onClick={() => save({ slug: error.slug })}>
+                  Usar {error.slug}
+                </button>
+              )}
+              <PendingChip label="Subdomínio em breve" detail={`A página fica em /p/${slug || "sua-marca"}. Com a hospedagem, ela vai para ${slug || "sua-marca"}.vyz.app.`} />
               {atLimit ? (
                 <div className="space-y-2 rounded-control border border-warning/60 bg-warning/10 p-3 text-[14px]">
                   <p>
-                    O {TIER_LABEL[ws.tier]} permite {ent.maxLandingPages} {ent.maxLandingPages === 1 ? "landing page publicada" : "landing pages publicadas"}.
+                    O {TIER_LABEL[ws.tier]} permite {limit} {limit === 1 ? "landing page publicada" : "landing pages publicadas"} e você já tem {publishedCount} no ar. Salve como
+                    rascunho, ou despublique outra.
                   </p>
                   <a href={waLink(msgUpgrade(TIER_LABEL[ws.tier], "um plano maior", "Preciso publicar mais landing pages."))} target="_blank" rel="noopener noreferrer" className={btn.small}>
                     <WhatsAppIcon size={16} /> Fazer upgrade
@@ -167,20 +153,18 @@ export function NewLandingFlow() {
                 </div>
               ) : null}
               <div className="flex flex-wrap gap-2">
-                <button type="button" disabled={atLimit || !trackingValid(tracking)} onClick={() => setPublished(persist(true))} className={btn.small}>
-                  Publicar
+                <button type="button" disabled={creating || atLimit || !trackingValid(tracking) || !!slugError} onClick={() => create(true)} className={btn.small}>
+                  {creating ? "Aguarde…" : "Publicar"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const lp = persist(false);
-                    if (lp) router.push(`/painel/landing-pages/${lp.id}`);
-                  }}
-                  className={`${btn.ghost} h-9`}
-                >
+                <button type="button" disabled={creating || !trackingValid(tracking) || !!slugError} onClick={() => create(false)} className={`${btn.ghost} h-9`}>
                   Salvar como rascunho
                 </button>
               </div>
+              {error && (
+                <p role="alert" className="text-[13px] text-error-fg">
+                  {error.text}
+                </p>
+              )}
               {!trackingValid(tracking) && <p className="text-[12.5px] text-error-fg">Corrija os IDs de rastreamento antes de publicar.</p>}
             </div>
           }
@@ -200,7 +184,7 @@ export function NewLandingFlow() {
           )}
         </div>
       )}
-      {t && <p className="text-[12px] text-fg-2">O progresso fica salvo neste navegador a cada passo.</p>}
+      {t && <p className="text-[12px] text-fg-2">O progresso fica salvo neste navegador até você criar a página.</p>}
     </div>
   );
 }

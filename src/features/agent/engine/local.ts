@@ -1,5 +1,5 @@
 // LocalEngine: entende perguntas por intenção/palavra-chave em PT-BR e
-// responde só com o que está no contexto (dados da demo). Nunca inventa
+// responde só com o que está no contexto (montado no servidor). Nunca inventa
 // número: sem dado, diz que não tem.
 
 import { metric, type MetricId } from "@/features/metrics/definitions";
@@ -134,7 +134,7 @@ function limits(q: string, ctx: AgentContext): AgentAnswer | null {
   }
   if (has(q, "conta*")) {
     return answer({
-      text: `Você cadastrou **${count(counts.accounts)} ${counts.accounts === 1 ? "conta" : "contas"}** de **${count(counts.contractedAccounts)}** contratadas.`,
+      text: `Você usa **${count(counts.accounts)} ${counts.accounts === 1 ? "conta" : "contas"}** de **${count(counts.contractedAccounts)}** contratadas.`,
       card: { label: "Contas", value: `${count(counts.accounts)} de ${count(counts.contractedAccounts)}` },
       action: { type: "navigate", href: "/painel/contas", label: "Abrir Contas" },
     });
@@ -176,8 +176,8 @@ export function respond(question: string, ctx: AgentContext): AgentAnswer {
   if (action) return action;
   if (has(q, "plano") && has(q, "qual", "meu", "estou", "tenho")) {
     return answer({
-      text: `Você está no plano **${ctx.tierLabel}** (simulado no modo demonstração). Ele libera **${count(ctx.ent.maxDashboards)} dashboards** e **${count(ctx.ent.maxLandingPages)} landing pages publicadas**.`,
-      card: { label: "Plano", value: ctx.tierLabel, note: "Simulação · não é cobrança" },
+      text: `Você está no plano **${ctx.tierLabel}**. Ele libera **${count(ctx.ent.maxDashboards)} dashboards** e **${count(ctx.ent.maxLandingPages)} landing pages publicadas**.`,
+      card: { label: "Plano", value: ctx.tierLabel, note: `${count(ctx.counts.contractedAccounts)} ${ctx.counts.contractedAccounts === 1 ? "conta contratada" : "contas contratadas"}` },
       action: { type: "navigate", href: "/painel/plano", label: "Ver plano" },
     });
   }
@@ -197,7 +197,7 @@ export function respond(question: string, ctx: AgentContext): AgentAnswer {
 }
 
 export class LocalEngine implements VyzEngine {
-  readonly label = "Motor local · dados da demo";
+  readonly label = "Motor local · dados da sua conta";
   async ask(question: string, ctx: AgentContext) {
     return respond(question, ctx);
   }

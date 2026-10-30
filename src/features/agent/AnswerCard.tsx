@@ -2,8 +2,6 @@
 
 import { LocateFixed } from "lucide-react";
 import type { ReactNode } from "react";
-import type { Dashboard } from "@/features/workspace/types";
-import { useCollection } from "@/lib/store/hooks";
 import type { AgentAnswer, AgentTarget } from "./engine";
 
 /** Texto com **negrito** (só essa marcação). */
@@ -22,10 +20,8 @@ export function RichText({ text }: { text: string }): ReactNode {
 
 /** KPI + variação + mini barras, e o "Mostrar no painel" quando o card existe. */
 export function AnswerCard({ answer, onShow }: { answer: AgentAnswer; onShow: (t: AgentTarget) => void }) {
-  const dashboards = useCollection<Dashboard>("dashboards");
+  // o alvo só vem quando o dashboard está no contexto do servidor e tem o card
   const { card, chart, target } = answer;
-  // só mostra o botão se o dashboard alvo ainda existe
-  const showable = target && dashboards.some((d) => d.id === target.dashboardId);
   if (!card && !chart) return null;
   const max = chart ? Math.max(...chart.items.map((i) => i.value)) || 1 : 1;
   return (
@@ -61,7 +57,7 @@ export function AnswerCard({ answer, onShow }: { answer: AgentAnswer; onShow: (t
           </ul>
         </div>
       )}
-      {showable && (
+      {target && (
         <button type="button" onClick={() => onShow(target)} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-control border border-line px-2.5 text-[12.5px] font-medium text-fg outline-none hover:border-accent hover:text-accent focus-visible:ring-2 focus-visible:ring-accent">
           <LocateFixed size={14} aria-hidden /> Mostrar no painel
         </button>

@@ -1,16 +1,14 @@
 "use client";
 
-import { BarChart3, Check, PanelsTopLeft } from "lucide-react";
+import { AlertTriangle, BarChart3, Check, PanelsTopLeft, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/kit";
 import { UsageBar } from "@/features/accounts/AccountsPage";
-import { TIER_LABEL } from "@/features/pricing/entitlements";
-import { dashboardTemplate } from "@/features/templates/dashboards";
-import { landingTemplate } from "@/features/templates/landing-pages";
+import { relativeTime } from "@/features/integrations/sync-label";
+import { ENTITLEMENTS, TIER_LABEL } from "@/features/pricing/entitlements";
 import { useHydrated } from "@/lib/hooks";
-import { useCollection } from "@/lib/store/hooks";
-import type { Account, Dashboard, LandingPage, ShareLink } from "./types";
-import { useWorkspace } from "./workspace";
+import type { HomeConnection, HomeData } from "./dto";
+import { useWorkspaceSession } from "./WorkspaceProvider";
 
 function greeting(hydrated: boolean): string {
   if (!hydrated) return "Olá";
@@ -18,37 +16,63 @@ function greeting(hydrated: boolean): string {
   return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
 }
 
-export function HomePage() {
-  const { ws, ent } = useWorkspace();
-  const hydrated = useHydrated();
-  const accounts = useCollection<Account>("accounts");
-  const dashboards = useCollection<Dashboard>("dashboards");
-  const pages = useCollection<LandingPage>("landingPages");
-  const links = useCollection<ShareLink>("shareLinks");
+const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 
-  const recent = [
-    ...dashboards.map((d) => ({ href: `/painel/dashboards/${d.id}`, title: d.name, sub: `Dashboard · ${dashboardTemplate(d.templateId)?.name ?? ""}`, at: d.updatedAt })),
-    ...pages.map((p) => ({ href: `/painel/landing-pages/${p.id}`, title: p.content.brand, sub: `Landing page · ${landingTemplate(p.templateId)?.name ?? ""}`, at: p.updatedAt })),
-  ]
-    .sort((a, b) => b.at.localeCompare(a.at))
-    .slice(0, 5);
+function ConnectionRow({ c, now, timeZone }: { c: HomeConnection; now: string; timeZone: string }) {
+  const status = !c.connected
+    ? { text: c.accountsCount ? "Conexão desfeita ou expirada" : "Não conectado", tone: "text-fg-2" }
+    : c.syncing
+      ? { text: "Sincronizando…", tone: "text-fg-2" }
+      : c.syncFailed
+        ? { text: "A última sincronização falhou", tone: "text-error-fg" }
+        : c.lastSyncedAt
+          ? { text: `Sincronizada ${relativeTime(c.lastSyncedAt, now, timeZone)}`, tone: "text-fg-2" }
+          : { text: c.enabledCount ? "Aguardando a primeira sincronização" : "Escolha as contas", tone: "text-fg-2" };
+  return (
+    <li className="flex items-center justify-between gap-3 py-2.5">
+      <span className="min-w-0">
+        <span className="flex items-center gap-2 font-medium">
+          <span className={`size-2 shrink-0 rounded-full ${c.connected ? "bg-accent" : "border border-line"}`} aria-hidden />
+          {c.name}
+        </span>
+        <span className={`flex items-center gap-1 text-[12.5px] ${status.tone}`}>
+          {c.syncFailed && <AlertTriangle size={12} aria-hidden />}
+          {c.syncing && <RefreshCw size={12} aria-hidden className="animate-spin motion-reduce:animate-none" />}
+          {status.text}
+        </span>
+      </span>
+      <span className="shrink-0 text-right text-[12.5px] text-fg-2 tnum">
+        {c.connected ? `${c.enabledCount} ${c.enabledCount === 1 ? "conta ativa" : "contas ativas"}` : ""}
+      </span>
+    </li>
+  );
+}
+
+export function HomePage({ data }: { data: HomeData }) {
+  const { user, workspace, access, usage } = useWorkspaceSession();
+  const hydrated = useHydrated();
+  const tier = access.tier ?? "base";
+  const ent = access.entitlements ?? ENTITLEMENTS[tier];
+  const connected = data.connections.some((c) => c.enabledCount > 0);
+  const firstDashboard = data.recent.find((r) => r.kind === "dashboard");
 
   const checklist = [
-    { done: accounts.length > 0, label: "Conectar as contas", text: "Cadastre a BM do Meta e a conta do Google Ads pelo ID.", href: "/painel/contas" },
-    { done: dashboards.length > 0, label: "Criar o primeiro dashboard", text: "Escolha um template e aponte as contas.", href: "/painel/dashboards/novo?novo=1" },
-    { done: links.length > 0, label: "Compartilhar com o cliente", text: "Gere o link só de leitura ou exporte o PDF.", href: dashboards[0] ? `/painel/dashboards/${dashboards[0].id}` : "/painel/dashboards" },
+    { done: connected, label: "Conectar as contas", text: "Conecte o Meta Ads e o Google Ads e escolha as contas.", href: "/painel/contas" },
+    { done: usage.dashboards > 0, label: "Criar o primeiro dashboard", text: "Escolha um template e aponte as contas.", href: "/painel/dashboards/novo?novo=1" },
+    { done: data.activeShareLinks > 0, label: "Compartilhar com o cliente", text: "Gere o link só de leitura ou exporte o PDF.", href: firstDashboard ? firstDashboard.href : "/painel/dashboards" },
   ];
+  const name = firstName(user.fullName);
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow={`${ws.name} · ${TIER_LABEL[ws.tier]}`} title={`${greeting(hydrated)}${ws.userName ? `, ${ws.userName}` : ""}.`} text="O número que decide o mês, para cada cliente." />
+      <PageHeader eyebrow={`${workspace.name} · ${TIER_LABEL[tier]}`} title={`${greeting(hydrated)}${name ? `, ${name}` : ""}.`} text="O número que decide o mês, para cada cliente." />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Link href="/painel/dashboards/novo?novo=1" className="group flex items-center gap-4 rounded-card bg-accent p-5 text-on-accent">
           <BarChart3 size={28} aria-hidden />
           <span>
             <span className="title block text-lg">Novo dashboard</span>
-            <span className="text-[13.5px]">20 templates, do e-commerce ao relatório executivo</span>
+            <span className="text-[13.5px]">Meta Ads e Google Ads com os dados das suas contas</span>
           </span>
         </Link>
         <Link href="/painel/landing-pages/novo?novo=1" className="flex items-center gap-4 rounded-card border border-line bg-card p-5 hover:border-accent">
@@ -65,32 +89,50 @@ export function HomePage() {
           <h2 id="h-recentes" className="title mb-3 text-lg">
             Recentes
           </h2>
-          {recent.length === 0 ? (
+          {data.recent.length === 0 ? (
             <p className="text-[14px] text-fg-2">Nada por aqui ainda. Comece por um dashboard.</p>
           ) : (
             <ul className="divide-y divide-line">
-              {recent.map((r) => (
-                <li key={r.href}>
-                  <Link href={r.href} className="flex flex-col py-2.5 hover:text-accent">
-                    <span className="font-medium">{r.title}</span>
-                    <span className="text-[12.5px] text-fg-2">{r.sub}</span>
+              {data.recent.map((r) => (
+                <li key={`${r.kind}:${r.id}`}>
+                  <Link href={r.href} className="flex items-start justify-between gap-3 py-2.5 hover:text-accent">
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{r.title}</span>
+                      <span className="block truncate text-[12.5px] text-fg-2">{r.sub}</span>
+                    </span>
+                    <span className="shrink-0 pt-0.5 text-[12px] text-fg-2">{relativeTime(r.updatedAt, data.now, workspace.timezone)}</span>
                   </Link>
                 </li>
               ))}
             </ul>
           )}
         </section>
-        <section className="space-y-4 rounded-card border border-line bg-card p-5" aria-labelledby="h-uso">
-          <h2 id="h-uso" className="title text-lg">
-            Uso do plano
-          </h2>
-          <UsageBar used={accounts.length} limit={ws.contractedAccounts} label="Contas" />
-          <UsageBar used={dashboards.length} limit={ent.maxDashboards} label="Dashboards" />
-          <UsageBar used={pages.filter((p) => p.published).length} limit={ent.maxLandingPages} label="Landing pages publicadas" />
-          <Link href="/painel/plano" className="inline-block text-[13.5px] font-semibold text-accent">
-            Ver limites do plano →
-          </Link>
-        </section>
+        <div className="space-y-4">
+          <section className="space-y-4 rounded-card border border-line bg-card p-5" aria-labelledby="h-uso">
+            <h2 id="h-uso" className="title text-lg">
+              Uso do plano
+            </h2>
+            <UsageBar used={usage.billableAccounts} limit={access.accountsQuantity} label="Contas" />
+            <UsageBar used={usage.dashboards} limit={ent.maxDashboards} label="Dashboards" />
+            <UsageBar used={usage.publishedLandingPages} limit={ent.maxLandingPages} label="Landing pages publicadas" />
+            <Link href="/painel/plano" className="inline-block text-[13.5px] font-semibold text-accent">
+              Ver limites do plano →
+            </Link>
+          </section>
+          <section className="rounded-card border border-line bg-card p-5" aria-labelledby="h-conexoes">
+            <h2 id="h-conexoes" className="title text-lg">
+              Conexões
+            </h2>
+            <ul className="mt-1 divide-y divide-line">
+              {data.connections.map((c) => (
+                <ConnectionRow key={c.provider} c={c} now={data.now} timeZone={workspace.timezone} />
+              ))}
+            </ul>
+            <Link href="/painel/contas" className="mt-2 inline-block text-[13.5px] font-semibold text-accent">
+              Abrir Contas →
+            </Link>
+          </section>
+        </div>
       </div>
 
       <section aria-labelledby="h-passos" className="rounded-card border border-line bg-card p-5">

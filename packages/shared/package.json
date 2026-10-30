@@ -1,0 +1,8 @@
+{
+  "name": "@vyz/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tipos da API, textos e regras puras compartilhados pelo site (Next) e pelo app nativo (Expo). Sem dependências de plataforma.",
+  "main": "src/index.ts",
+  "types": "src/index.ts"
+}

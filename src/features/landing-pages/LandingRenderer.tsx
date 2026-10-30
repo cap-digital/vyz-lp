@@ -32,10 +32,16 @@ type LandingRendererProps = {
   content: LandingContent;
   /** Esconde o selo "Feito com VYZ" (marca própria). */
   hideBadge?: boolean;
+  /** Página no ar: formulário de verdade no lugar da ilustração. */
+  form?: ReactNode;
+  /** Destino do botão principal (página no ar). */
+  ctaHref?: string;
+  /** Link do botão de WhatsApp (página no ar). */
+  whatsappHref?: string | null;
 };
 
 /** A página em si. Responde à largura do contêiner (@container), não da tela. */
-export function LandingRenderer({ template, content, hideBadge }: LandingRendererProps) {
+export function LandingRenderer({ template, content, hideBadge, form, ctaHref, whatsappHref }: LandingRendererProps) {
   const color = /^#[0-9a-f]{6}$/i.test(content.color) ? content.color : "#4B5320";
   const ink = onColor(color);
   const on = (s: keyof LandingContent["sections"]) => !!content.sections[s];
@@ -44,10 +50,13 @@ export function LandingRenderer({ template, content, hideBadge }: LandingRendere
   // ordem de montagem dos blocos (wireframe que se preenche)
   const at = (i: number) => 260 + i * 120;
 
-  const cta = (
-    <span className="inline-flex h-9 items-center rounded-[7px] bg-[var(--lp)] px-4 text-[12px] font-semibold text-[var(--lp-ink)] @[700px]:h-11 @[700px]:text-[14px]">
+  const ctaClass = "inline-flex h-9 items-center rounded-[7px] bg-[var(--lp)] px-4 text-[12px] font-semibold text-[var(--lp-ink)] @[700px]:h-11 @[700px]:text-[14px]";
+  const cta = ctaHref ? (
+    <a href={ctaHref} className={`${ctaClass} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lp)]`} {...(ctaHref.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
       {content.cta || "Saiba mais"}
-    </span>
+    </a>
+  ) : (
+    <span className={ctaClass}>{content.cta || "Saiba mais"}</span>
   );
 
   return (
@@ -55,7 +64,7 @@ export function LandingRenderer({ template, content, hideBadge }: LandingRendere
       <div className="space-y-5 p-4 @[700px]:space-y-8 @[700px]:p-8">
         <Block d={at(0)} className="flex items-center justify-between gap-3">
           {content.logo ? (
-            // eslint-disable-next-line @next/next/no-img-element -- dataURL local, sem otimização
+            // eslint-disable-next-line @next/next/no-img-element -- logo do Storage ou dataURL do rascunho, sem otimização
             <img src={content.logo} alt={content.brand} className="h-7 w-auto max-w-[140px] object-contain" />
           ) : (
             <p className="text-[14px] font-extrabold tracking-[-0.02em] @[700px]:text-[17px]" style={{ color }}>
@@ -86,7 +95,8 @@ export function LandingRenderer({ template, content, hideBadge }: LandingRendere
               {cta}
             </Block>
           </div>
-          {template.hero === "form" && (
+          {template.hero === "form" && form && <div id="formulario">{form}</div>}
+          {template.hero === "form" && !form && (
             <Block d={at(5)}>
               <div className="space-y-2 rounded-[10px] border border-[#cfd3c6] bg-white p-3 @[700px]:p-5">
                 {content.fields.slice(0, 4).map((f, i) => (
@@ -202,9 +212,14 @@ export function LandingRenderer({ template, content, hideBadge }: LandingRendere
         <Block d={at(13)} className="flex items-center justify-between border-t border-[#cfd3c6] pt-3">
           <p className="text-[10px] text-[#6f726a]">© {content.brand || "Sua marca"}</p>
           <div className="flex items-center gap-2">
-            {on("whatsapp") && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#1f2612] px-2.5 py-1 text-[10px] font-semibold text-white">WhatsApp</span>
-            )}
+            {on("whatsapp") &&
+              (whatsappHref ? (
+                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full bg-[#1f2612] px-2.5 py-1 text-[10px] font-semibold text-white @[700px]:text-[12px]">
+                  WhatsApp
+                </a>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#1f2612] px-2.5 py-1 text-[10px] font-semibold text-white">WhatsApp</span>
+              ))}
             {!hideBadge && (
               <span className="inline-flex items-center gap-1 rounded-full border border-[#cfd3c6] py-0.5 pr-2 pl-0.5 text-[9.5px] font-medium text-[#4b5320]">
                 <span className="size-4">

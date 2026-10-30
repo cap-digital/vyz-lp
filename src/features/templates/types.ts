@@ -42,7 +42,8 @@ export type PageId =
   | "carteira"
   | "canais"
   | "saude-conta"
-  | "executivo";
+  | "executivo"
+  | "termos";
 
 export type BuildContext = { profile: Profile; sources: PlatformId[] };
 
@@ -69,4 +70,6 @@ export type DashboardTemplate = {
   sources: PlatformId[];
   pages: PageId[];
   description: string;
+  /** live = lê os dados sincronizados das contas; sample (padrão) = dados de exemplo. */
+  dataMode?: "sample" | "live";
 };

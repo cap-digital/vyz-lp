@@ -1,11 +1,13 @@
 "use client";
 
-import { Check, Copy, Link2 } from "lucide-react";
+import { ArrowRight, Check, Copy, Link2 } from "lucide-react";
 import { AnimatePresence, m, useAnimate, useReducedMotion } from "motion/react";
+import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Magnetic } from "@/components/motion/Magnetic";
 import { Odometer } from "@/components/ui/Odometer";
+import { buildOrder } from "@/features/checkout/order";
 import { usePlan } from "@/features/marketing/state/PlanProvider";
 import { simulationUrl } from "@/features/marketing/state/UrlSync";
 import { btn } from "@/components/ui/styles";
@@ -78,6 +80,8 @@ export function Comanda({ ref }: { ref?: Ref<HTMLElement> }) {
   const query = toQuery(state);
   const url = hydrated ? simulationUrl(query) : `/?${query}`;
   const message = hydrated ? buildPlanMessage(state, q, url) : MSG_SPECIALIST;
+  // assinatura direta no checkout; acima de 30 contas ou mensal sem plano, o especialista
+  const canSubscribe = !buildOrder(state).blocked;
 
   // o cupom desce um pouco quando uma linha nova é impressa
   const rows = q.lines.length + (q.oneTime > 0 ? 1 : 0);
@@ -208,12 +212,27 @@ export function Comanda({ ref }: { ref?: Ref<HTMLElement> }) {
         )}
 
         <div className="dotted mt-4 space-y-2 pt-5">
-          <Magnetic className="w-full" strength={0.15}>
-            <a href={waLink(message)} target="_blank" rel="noopener noreferrer" className={`${btn.primary} w-full`}>
-              <WhatsAppIcon />
-              {over ? "Falar com especialista" : "Enviar no WhatsApp"}
-            </a>
-          </Magnetic>
+          {canSubscribe ? (
+            <>
+              <Magnetic className="w-full" strength={0.15}>
+                <Link href={`/assinar?${query}`} className={`${btn.primary} w-full`}>
+                  Assinar agora
+                  <ArrowRight size={17} aria-hidden />
+                </Link>
+              </Magnetic>
+              <a href={waLink(message)} target="_blank" rel="noopener noreferrer" className={`${btn.secondary} h-11 w-full px-3 text-sm`}>
+                <WhatsAppIcon />
+                Enviar no WhatsApp
+              </a>
+            </>
+          ) : (
+            <Magnetic className="w-full" strength={0.15}>
+              <a href={waLink(message)} target="_blank" rel="noopener noreferrer" className={`${btn.primary} w-full`}>
+                <WhatsAppIcon />
+                {over ? "Falar com especialista" : "Enviar no WhatsApp"}
+              </a>
+            </Magnetic>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <CopyButton
               done={copied === "link"}

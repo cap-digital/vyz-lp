@@ -1,56 +1,92 @@
 "use client";
 
-import { ArrowDown, ArrowLeft, ArrowRight, Check, GripVertical, Lock, Plus } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+// Criar e editar dashboard, em passos: template → contas → páginas → metas e
+// ajustes → revisar. O estado vive na tela; quem grava é o servidor
+// (createDashboard / updateDashboard), que confere plano, páginas e contas de novo.
+
+import { ArrowDown, ArrowLeft, ArrowRight, Check, GripVertical, Lock } from "lucide-react";
+import Link from "next/link";
+import { useState, useTransition, type ReactNode } from "react";
 import { ColorField } from "@/components/ui/ColorField";
-import { RadioCard, RadioGroup } from "@/components/ui/controls";
 import { FileInput, readImage } from "@/components/ui/FileInput";
 import { Checkbox, LockBadge, PendingChip, SelectField, TextField } from "@/components/ui/kit";
 import { btn } from "@/components/ui/styles";
-import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
-import { AccountForm, accountIdLabel } from "@/features/accounts/AccountForm";
-import { UsageBar } from "@/features/accounts/AccountsPage";
 import { PLATFORMS, type PlatformId } from "@/features/accounts/platforms";
-import { availableIn, canUse, TIER_LABEL } from "@/features/pricing/entitlements";
-import { dashboardTemplate } from "@/features/templates/dashboards";
-import { PAGE_LIBRARY, PAGES } from "@/features/templates/pages";
-import type { PageId } from "@/features/templates/types";
-import { ATTRIBUTIONS, PERIODS, type Account, type Dashboard, type DashboardDraft, type PeriodId } from "@/features/workspace/types";
-import { useWorkspace } from "@/features/workspace/workspace";
+import { availableIn, TIER_LABEL, type Tier } from "@/features/pricing/entitlements";
+import { anyDashboardTemplate, isLiveTemplate } from "@/features/templates/live";
+import { PAGES } from "@/features/templates/pages";
+import type { DashboardTemplate, PageId } from "@/features/templates/types";
+import { ATTRIBUTIONS, PERIODS, type PeriodId } from "@/features/workspace/types";
 import { brl } from "@/lib/format";
-import { newId } from "@/lib/ids";
-import { useCollection, useDoc } from "@/lib/store/hooks";
-import { store } from "@/lib/store/store";
-import { msgUpgrade, waLink } from "@/lib/whatsapp";
-import { DEFAULT_SETTINGS } from "./data";
+import { createDashboard, updateDashboard } from "@/server/dashboards/actions";
+import { defaultPages, pageOptions, type DashboardDetail, type SourceOption } from "./model";
+import type { DashboardFields } from "./schema";
 import { TemplateGallery } from "./TemplateGallery";
 
-const STEPS = ["Template", "Contas", "Páginas", "Metas e ajustes", "Revisar e gerar"];
+const STEPS = ["Template", "Contas", "Páginas", "Metas e ajustes", "Revisar"];
+const DEFAULT_MARGIN = 0.4;
 
 const reais = (cents: number) => (cents ? String(Math.round(cents / 100)) : "");
 const cents = (v: string) => Math.round((Number(v.replace(/\./g, "").replace(",", ".")) || 0) * 100);
+const roas = (margin: number) => (1 / margin).toFixed(1).replace(".", ",");
 
-function Stepper({ step, onGo, max }: { step: number; onGo: (s: number) => void; max: number }) {
+type Draft = Omit<DashboardFields, "pages"> & { templateId: string | null; pages: PageId[] };
+
+function draftFrom(d: DashboardDetail): Draft {
+  return {
+    templateId: d.templateId,
+    name: d.name,
+    client: d.client,
+    goal: d.settings.goal,
+    budget: d.settings.budget,
+    margin: d.margin,
+    period: d.settings.period,
+    customDays: d.settings.customDays,
+    attribution: d.settings.attribution,
+    pages: d.pages,
+    accountIds: d.sources.map((s) => s.id),
+    brandColor: d.brand?.color || null,
+    hideVyz: !!d.brand?.hideVyz,
+  };
+}
+
+const EMPTY: Draft = {
+  templateId: null,
+  name: "",
+  client: "",
+  goal: 0,
+  budget: 0,
+  margin: DEFAULT_MARGIN,
+  period: "30d",
+  customDays: 14,
+  attribution: "7c1v",
+  pages: [],
+  accountIds: [],
+  brandColor: null,
+  hideVyz: false,
+};
+
+function Stepper({ step, onGo, max, skip }: { step: number; onGo: (s: number) => void; max: number; skip: number[] }) {
   return (
     <ol className="flex gap-1 overflow-x-auto pb-1" aria-label="Passos">
       {STEPS.map((label, i) => {
         const n = i + 1;
         const done = n < step;
         const current = n === step;
+        const off = n > max || skip.includes(n);
         return (
-          <li key={label} className={step === i + 1 ? "min-w-0 flex-[3] sm:flex-1" : "min-w-0 flex-1"}>
+          <li key={label} className={current ? "min-w-0 flex-[3] sm:flex-1" : "min-w-0 flex-1"}>
             <button
               type="button"
-              disabled={n > max}
+              disabled={off}
               onClick={() => onGo(n)}
               aria-current={current ? "step" : undefined}
-              className="group flex w-full min-w-[2.5rem] flex-col gap-1.5 text-left disabled:cursor-default sm:min-w-[7.5rem]"
+              className="group flex w-full min-w-[2.5rem] flex-col gap-1.5 rounded-control text-left outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-default sm:min-w-[7.5rem]"
             >
               <span className={`h-[var(--cut)] w-full rounded-full ${done || current ? "bg-accent" : "bg-line"}`} />
-              <span className={`flex items-center gap-1.5 text-[12.5px] ${current ? "font-semibold text-fg" : done ? "text-fg" : "text-fg-2"}`}>
-                <span className="tnum">{String(n).padStart(2, "0")}</span> <span className={n === step ? "" : "hidden sm:inline"}>{label}</span>
-                {done && <Check size={13} aria-hidden className="text-accent" />}
+              <span className={`flex items-center gap-1.5 text-[12.5px] ${current ? "font-semibold text-fg" : done ? "text-fg" : "text-fg-2"} ${skip.includes(n) ? "line-through opacity-60" : ""}`}>
+                <span className="tnum">{String(n).padStart(2, "0")}</span> <span className={current ? "" : "hidden sm:inline"}>{label}</span>
+                {done && !skip.includes(n) && <Check size={13} aria-hidden className="text-accent" />}
               </span>
             </button>
           </li>
@@ -62,7 +98,7 @@ function Stepper({ step, onGo, max }: { step: number; onGo: (s: number) => void;
 
 function Section({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
   return (
-    <section className="rounded-card border border-line bg-card p-5">
+    <section className="rounded-card border border-line bg-card p-4 sm:p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="title text-lg">{title}</h2>
         {aside}
@@ -72,157 +108,138 @@ function Section({ title, children, aside }: { title: string; children: ReactNod
   );
 }
 
-export function NewDashboardFlow() {
-  const router = useRouter();
-  const params = useSearchParams();
-  const { ws, ent } = useWorkspace();
-  const saved = useDoc<DashboardDraft>("draft:dashboard");
-  const accounts = useCollection<Account>("accounts");
-  const dashboards = useCollection<Dashboard>("dashboards");
-  const [adding, setAdding] = useState<PlatformId | null>(null);
-  const [generating, setGenerating] = useState(false);
+export type DashboardFlowProps = {
+  /** Sem dashboard = criar; com = editar (o template não muda). */
+  dashboard?: DashboardDetail;
+  sources: SourceOption[];
+  tier: Tier;
+  /** Páginas liberadas até este plano. */
+  pagesTier: Tier;
+  whiteLabel: boolean;
+  /** Dashboards em uso e o limite do plano (criar). */
+  used: number;
+  limit: number;
+  /** ?template= abre direto nas contas. */
+  initialTemplate?: string | null;
+};
+
+export function NewDashboardFlow({ dashboard, sources, tier, pagesTier, whiteLabel, used, limit, initialTemplate }: DashboardFlowProps) {
+  const editing = !!dashboard;
+  const [draft, setDraft] = useState<Draft>(() => {
+    if (dashboard) return draftFrom(dashboard);
+    const t = initialTemplate ? anyDashboardTemplate(initialTemplate) : undefined;
+    return t ? withTemplate(EMPTY, t, pagesTier, sources) : EMPTY;
+  });
+  const [step, setStep] = useState(() => (dashboard ? (isLiveTemplate(dashboard.templateId) ? 2 : 3) : draft.templateId ? (isLiveTemplate(draft.templateId) ? 2 : 3) : 1));
   const [dragging, setDragging] = useState<number | null>(null);
-  const handled = useRef(false);
+  const [error, setError] = useState<{ message: string; fields?: Record<string, string> } | null>(null);
+  const [pending, start] = useTransition();
 
-  const draft: DashboardDraft = saved ?? { step: 1 };
-  const save = (patch: Partial<DashboardDraft>) => {
-    const cur = store.getDoc<DashboardDraft>("draft:dashboard") ?? { step: 1 };
-    store.setDoc("draft:dashboard", { ...cur, ...patch });
-  };
-
-  // ?novo=1 começa do zero; ?template= pula para as contas; ?editar=id volta nos passos 3 e 4
-  useEffect(() => {
-    if (handled.current) return;
-    handled.current = true;
-    const editar = params.get("editar");
-    const template = params.get("template");
-    if (editar) {
-      const d = store.get<Dashboard>("dashboards", editar);
-      if (d) store.setDoc<DashboardDraft>("draft:dashboard", { ...d, step: Number(params.get("passo")) || 3, editingId: d.id });
-    } else if (template && dashboardTemplate(template)) {
-      store.setDoc<DashboardDraft>("draft:dashboard", { step: 2, templateId: template, pages: dashboardTemplate(template)!.pages });
-    } else if (params.get("novo")) {
-      store.setDoc<DashboardDraft>("draft:dashboard", { step: 1 });
-    }
-  }, [params]);
-
-  const t = draft.templateId ? dashboardTemplate(draft.templateId) : undefined;
-  const step = t ? draft.step : 1;
-  const settings = { ...DEFAULT_SETTINGS, ...draft.settings };
-  const pages = draft.pages ?? t?.pages ?? [];
-  const editing = !!draft.editingId;
-  const atLimit = !editing && dashboards.length >= ent.maxDashboards;
+  const t = draft.templateId ? anyDashboardTemplate(draft.templateId) : undefined;
+  const live = !!t && isLiveTemplate(t.id);
+  const save = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  const atLimit = !editing && used >= limit;
+  const platformSources = t ? sources.filter((s) => t.sources.includes(s.platformId)) : [];
+  const options = t ? pageOptions(t, pagesTier) : [];
   const isLeadProfile = t && ["leads", "imob", "saude", "educacao", "infoproduto"].includes(t.profile);
+  // dashboards de exemplo não usam contas: o passo 2 fica de fora
+  const skip = t && !live ? [2] : [];
+  const go = (s: number) => setStep(skip.includes(s) ? (s > step ? s + 1 : s - 1) : s);
+  const accountsMissing = live && draft.accountIds.length === 0;
+  // na edição o template não muda: o primeiro passo é o das contas (ou das páginas)
+  const firstStep = editing ? (live ? 2 : 3) : 1;
 
-  const go = (s: number) => save({ step: s });
-
-  function generate() {
+  function submit() {
     if (!t) return;
-    setGenerating(true);
-    const now = new Date().toISOString();
-    const existing = draft.editingId ? store.get<Dashboard>("dashboards", draft.editingId) : null;
-    const d: Dashboard = {
-      id: draft.editingId ?? newId("d_"),
-      templateId: t.id,
-      name: draft.name?.trim() || t.name,
-      client: draft.client?.trim() || "Cliente",
-      accounts: draft.accounts ?? {},
-      pages: pages.length ? pages : t.pages,
-      settings,
-      brand: ws.tier === "personalizado" ? (draft.brand ?? ws.brand) : undefined,
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
+    setError(null);
+    const fields: DashboardFields = {
+      name: draft.name.trim() || t.name,
+      client: draft.client.trim(),
+      goal: draft.goal,
+      budget: draft.budget,
+      margin: draft.margin,
+      period: draft.period,
+      customDays: draft.customDays,
+      attribution: draft.attribution,
+      pages: draft.pages,
+      accountIds: live ? draft.accountIds : [],
+      brandColor: whiteLabel ? draft.brandColor : null,
+      hideVyz: whiteLabel ? draft.hideVyz : false,
     };
-    store.put("dashboards", d);
-    // a varredura do scanner roda enquanto o dashboard "se monta"
-    window.setTimeout(() => {
-      store.setDoc("draft:dashboard", null);
-      router.push(`/painel/dashboards/${d.id}?novo=1`);
-    }, 750);
+    start(async () => {
+      const r = dashboard ? await updateDashboard(dashboard.id, fields) : await createDashboard({ ...fields, templateId: t.id });
+      // sucesso redireciona para o dashboard; aqui só chegam os erros
+      if (r && !r.ok) setError(r.error);
+    });
   }
 
-  const libraryPages: PageId[] = t ? [...t.pages, ...PAGE_LIBRARY.filter((p) => !t.pages.includes(p))] : [];
-
-  function togglePage(p: PageId, on: boolean) {
-    const next = on ? [...pages, p] : pages.filter((x) => x !== p);
-    save({ pages: next });
-  }
   function move(i: number, dir: number) {
     const j = i + dir;
-    if (j < 0 || j >= pages.length) return;
-    const next = [...pages];
+    if (j < 0 || j >= draft.pages.length) return;
+    const next = [...draft.pages];
     [next[i], next[j]] = [next[j], next[i]];
     save({ pages: next });
   }
 
+  const canContinue = step === 2 ? !accountsMissing : step === 3 ? draft.pages.length > 0 : true;
+
   return (
     <div className="space-y-6">
-      <Stepper step={step} max={t ? 5 : 1} onGo={go} />
+      <Stepper step={step} max={t ? 5 : 1} onGo={go} skip={editing ? [1, ...skip] : skip} />
 
-      {step === 1 && (
+      {step === 1 && !editing && (
         <TemplateGallery
+          tier={tier}
+          canCreate
+          enabledAccounts={sources.reduce<Partial<Record<PlatformId, number>>>((acc, s) => (s.isEnabled ? { ...acc, [s.platformId]: (acc[s.platformId] ?? 0) + 1 } : acc), {})}
           onUse={(id) => {
-            const tt = dashboardTemplate(id)!;
-            save({ templateId: id, pages: tt.pages, step: 2, accounts: {} });
+            const tt = anyDashboardTemplate(id);
+            if (!tt) return;
+            setDraft((d) => withTemplate(d, tt, pagesTier, sources));
+            setStep(isLiveTemplate(tt.id) ? 2 : 3);
           }}
         />
       )}
 
-      {t && step === 2 && (
-        <Section
-          title={`Contas · ${t.name}`}
-          aside={<UsageBar used={accounts.length} limit={ws.contractedAccounts} label="Contas × contratadas" />}
-        >
-          <p className="mb-4 text-[14px] text-fg-2">Este template usa {t.sources.map((s) => PLATFORMS[s].name).join(", ")}. Escolha uma conta já cadastrada ou cadastre pelo ID.</p>
-          <div className="space-y-4">
-            {t.sources.map((src) => {
-              const p = PLATFORMS[src];
-              const locked = !canUse(ws.tier, p.tier);
-              const options = accounts.filter((a) => a.platform === src);
-              const chosen = draft.accounts?.[src];
-              return (
-                <div key={src} className="rounded-card border border-line bg-bg p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-semibold">{p.name}</p>
-                    {locked ? <LockBadge label={availableIn(p.tier)} /> : <span className="rounded-chip border border-dashed border-line px-2.5 py-0.5 text-[12px] text-fg-2">Aguardando conexão</span>}
-                  </div>
-                  {!locked && (
-                    <div className="mt-3 space-y-2">
-                      <RadioGroup label={`Conta de ${p.name}`} value={chosen} onChange={(id) => save({ accounts: { ...draft.accounts, [src]: id } })} className="space-y-2">
-                        {options.map((a) => (
-                          <RadioCard key={a.id} value={a.id} checked={chosen === a.id}>
-                            <span className="min-w-0">
-                              <span className="block truncate font-medium">{a.name}</span>
-                              <span className="block text-[12.5px] text-fg-2 tnum">{accountIdLabel(a)}</span>
-                            </span>
-                          </RadioCard>
-                        ))}
-                      </RadioGroup>
-                      {adding === src ? (
-                        <div className="rounded-control border border-line p-3">
-                          <AccountForm
-                            platform={src}
-                            onSaved={(a) => {
-                              save({ accounts: { ...draft.accounts, [src]: a.id } });
-                              setAdding(null);
-                            }}
-                            onCancel={() => setAdding(null)}
-                          />
-                        </div>
-                      ) : (
-                        <button type="button" onClick={() => setAdding(src)} className={`${btn.ghost} h-9 px-2 text-[14px]`}>
-                          <Plus size={15} aria-hidden /> Cadastrar {options.length ? "outra conta" : "conta"} pelo ID
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-4">
-            <PendingChip label="Conexão automática (OAuth) em breve" detail="Por enquanto, o dashboard usa dados de amostra. Quando a conexão chegar, os mesmos widgets passam a ler os dados reais." />
-          </div>
+      {t && step === 2 && live && (
+        <Section title={`Contas · ${t.name}`}>
+          <p className="mb-4 text-[14px] text-fg-2">
+            Escolha as contas do {t.sources.map((s) => PLATFORMS[s].name).join(" e ")} que alimentam este dashboard. Os números de todas são somados.
+          </p>
+          {platformSources.length === 0 ? (
+            <div className="flex flex-col gap-3 rounded-control border border-dashed border-line p-4 text-[14px] sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-fg-2">Nenhuma conta do {PLATFORMS[t.sources[0]].name} conectada ainda.</p>
+              <Link href="/painel/contas" className={`${btn.small} shrink-0`}>
+                Conectar em Contas
+              </Link>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {platformSources.map((a) => {
+                const linked = !!dashboard?.sources.some((s) => s.id === a.id);
+                const off = !a.isEnabled && !linked;
+                return (
+                  <li key={a.id} className={`rounded-control border border-line bg-bg p-3 ${off ? "opacity-70" : ""}`}>
+                    <Checkbox
+                      label={<span className="font-medium">{a.name}</span>}
+                      hint={[a.businessName, a.isEnabled ? (a.lastSyncedAt ? "Ativa" : "Ativa · importando os dados") : linked ? "Desativada · os dados já importados continuam" : "Desativada · ative em Contas"].filter(Boolean).join(" · ")}
+                      checked={draft.accountIds.includes(a.id)}
+                      disabled={off}
+                      onChange={(on) => save({ accountIds: on ? [...draft.accountIds, a.id] : draft.accountIds.filter((x) => x !== a.id) })}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {error?.fields?.accountIds && <p className="mt-2 text-[12.5px] text-error-fg">{error.fields.accountIds}</p>}
+          <p className="mt-4 text-[12.5px] text-fg-2">
+            Falta alguma conta? Ative em{" "}
+            <Link href="/painel/contas" className="text-accent underline-offset-2 hover:underline">
+              Contas
+            </Link>
+            , dentro do limite do plano.
+          </p>
         </Section>
       )}
 
@@ -230,38 +247,45 @@ export function NewDashboardFlow() {
         <Section title="Páginas do dashboard">
           <div className="grid gap-6 lg:grid-cols-2">
             <div>
-              <p className="mb-2 text-[13px] font-medium text-fg-2">Biblioteca de páginas</p>
+              <p className="mb-2 text-[13px] font-medium text-fg-2">{live ? "Páginas deste template" : "Biblioteca de páginas"}</p>
               <ul className="space-y-2">
-                {libraryPages.map((p) => {
-                  const def = PAGES[p];
-                  const locked = !canUse(ws.tier, def.tier);
+                {options.map((o) => {
+                  const def = PAGES[o.id];
                   return (
-                    <li key={p} className={`rounded-control border border-line bg-bg p-3 ${locked ? "opacity-70" : ""}`}>
+                    <li key={o.id} className={`rounded-control border border-line bg-bg p-3 ${o.locked ? "opacity-70" : ""}`}>
                       <Checkbox
                         label={
                           <span className="flex flex-wrap items-center gap-2">
                             <span className="font-medium">{def.name}</span>
-                            {locked && <LockBadge label={availableIn(def.tier)} />}
-                            {def.soon && <span className="rounded-chip bg-accent-soft px-2 py-0.5 text-[11px]">em breve</span>}
+                            {o.locked && <LockBadge label={availableIn(o.tier)} />}
+                            {o.soon && <span className="rounded-chip bg-accent-soft px-2 py-0.5 text-[11px]">em breve</span>}
                           </span>
                         }
                         hint={def.description}
-                        checked={pages.includes(p)}
-                        disabled={locked}
-                        onChange={(on) => togglePage(p, on)}
+                        checked={draft.pages.includes(o.id)}
+                        disabled={o.locked && !draft.pages.includes(o.id)}
+                        onChange={(on) => save({ pages: on ? [...draft.pages, o.id] : draft.pages.filter((x) => x !== o.id) })}
                       />
                     </li>
                   );
                 })}
               </ul>
+              {options.some((o) => o.locked) && (
+                <p className="mt-3 text-[12.5px] text-fg-2">
+                  Páginas com cadeado são de um plano acima do {TIER_LABEL[tier]}.{" "}
+                  <Link href="/painel/plano" className="text-accent underline-offset-2 hover:underline">
+                    Ver planos
+                  </Link>
+                </p>
+              )}
             </div>
             <div>
               <p className="mb-2 text-[13px] font-medium text-fg-2">Ordem das abas (arraste ou use as setas)</p>
-              {pages.length === 0 ? (
+              {draft.pages.length === 0 ? (
                 <p className="rounded-control border border-dashed border-line p-4 text-[14px] text-fg-2">Escolha pelo menos uma página.</p>
               ) : (
                 <ol className="space-y-2">
-                  {pages.map((p, i) => (
+                  {draft.pages.map((p, i) => (
                     <li
                       key={p}
                       draggable
@@ -269,7 +293,7 @@ export function NewDashboardFlow() {
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => {
                         if (dragging === null || dragging === i) return;
-                        const next = [...pages];
+                        const next = [...draft.pages];
                         const [it] = next.splice(dragging, 1);
                         next.splice(i, 0, it);
                         save({ pages: next });
@@ -279,11 +303,11 @@ export function NewDashboardFlow() {
                     >
                       <GripVertical size={16} aria-hidden className="cursor-grab text-fg-2" />
                       <span className="w-6 text-fg-2 tnum">{i + 1}</span>
-                      <span className="flex-1 font-medium">{PAGES[p].name}</span>
+                      <span className="min-w-0 flex-1 truncate font-medium">{PAGES[p].name}</span>
                       <button type="button" aria-label={`Subir ${PAGES[p].name}`} onClick={() => move(i, -1)} disabled={i === 0} className="inline-flex size-8 items-center justify-center rounded-control border border-line disabled:opacity-30">
                         <ArrowDown size={14} aria-hidden className="rotate-180" />
                       </button>
-                      <button type="button" aria-label={`Descer ${PAGES[p].name}`} onClick={() => move(i, 1)} disabled={i === pages.length - 1} className="inline-flex size-8 items-center justify-center rounded-control border border-line disabled:opacity-30">
+                      <button type="button" aria-label={`Descer ${PAGES[p].name}`} onClick={() => move(i, 1)} disabled={i === draft.pages.length - 1} className="inline-flex size-8 items-center justify-center rounded-control border border-line disabled:opacity-30">
                         <ArrowDown size={14} aria-hidden />
                       </button>
                     </li>
@@ -299,49 +323,70 @@ export function NewDashboardFlow() {
         <div className="space-y-4">
           <Section title="Metas e ajustes">
             <div className="grid gap-4 sm:grid-cols-2">
-              <TextField label="Nome do dashboard" value={draft.name ?? ""} placeholder={t.name} onChange={(name) => save({ name })} />
-              <TextField label="Cliente" value={draft.client ?? ""} placeholder="Ex.: Loja Verde" onChange={(client) => save({ client })} />
+              <TextField label="Nome do dashboard" value={draft.name} placeholder={t.name} error={error?.fields?.name} onChange={(name) => save({ name })} />
+              <TextField label="Cliente" value={draft.client} placeholder="Ex.: Loja Verde" error={error?.fields?.client} onChange={(client) => save({ client })} />
               <TextField
                 label={isLeadProfile ? "Meta de CPL" : "Meta de CPA"}
                 prefix="R$"
                 inputMode="numeric"
-                value={reais(settings.goal)}
+                value={reais(draft.goal)}
                 placeholder="60"
                 hint="Vira a linha tracejada nos gráficos."
-                onChange={(v) => save({ settings: { ...draft.settings, goal: cents(v) } })}
+                onChange={(v) => save({ goal: cents(v) })}
               />
               <TextField
                 label="Margem"
                 suffix="%"
                 inputMode="numeric"
-                value={String(Math.round(settings.margin * 100))}
-                hint={`ROAS de equilíbrio = 1 ÷ margem = ${(1 / Math.max(0.01, settings.margin)).toFixed(1).replace(".", ",")}`}
-                onChange={(v) => save({ settings: { ...draft.settings, margin: Math.min(0.95, Math.max(0.01, (Number(v) || 0) / 100)) } })}
+                value={draft.margin ? String(Math.round(draft.margin * 100)) : ""}
+                placeholder="sem margem"
+                hint={draft.margin ? `ROAS de equilíbrio = 1 ÷ margem = ${roas(draft.margin)}` : "Sem margem, o equilíbrio é ROAS 1 (receita = investimento)."}
+                onChange={(v) => {
+                  const n = Number(v.replace(/\D/g, ""));
+                  save({ margin: n > 0 ? Math.min(100, n) / 100 : null });
+                }}
               />
               <TextField
                 label="Verba mensal"
                 prefix="R$"
                 inputMode="numeric"
-                value={reais(settings.budget)}
+                value={reais(draft.budget)}
                 placeholder="50000"
                 hint="Usada no pacing e na projeção do mês."
-                onChange={(v) => save({ settings: { ...draft.settings, budget: cents(v) } })}
+                onChange={(v) => save({ budget: cents(v) })}
               />
-              <SelectField label="Período padrão" value={settings.period} onChange={(v) => save({ settings: { ...draft.settings, period: v as PeriodId } })} options={PERIODS} />
-              <SelectField label="Moeda" value="BRL" onChange={() => {}} options={[{ value: "BRL", label: "Real (R$)" }]} />
-              <SelectField label="Janela de atribuição exibida" value={settings.attribution} onChange={(v) => save({ settings: { ...draft.settings, attribution: v } })} options={ATTRIBUTIONS} />
+              <SelectField label="Período padrão" value={draft.period} onChange={(v) => save({ period: v as PeriodId })} options={PERIODS} />
+              {draft.period === "custom" && (
+                <TextField
+                  label="Dias do período personalizado"
+                  inputMode="numeric"
+                  value={String(draft.customDays)}
+                  hint="De 3 a 60 dias, terminando ontem."
+                  onChange={(v) => save({ customDays: Math.min(60, Math.max(3, Number(v.replace(/\D/g, "")) || 3)) })}
+                />
+              )}
+              <SelectField label="Janela de atribuição exibida" value={draft.attribution} onChange={(v) => save({ attribution: v })} options={ATTRIBUTIONS} />
             </div>
           </Section>
 
-          <Section title="Marca" aside={ws.tier !== "personalizado" ? <LockBadge label={availableIn("personalizado")} /> : undefined}>
-            {ws.tier === "personalizado" ? (
-              <BrandFields value={draft.brand ?? ws.brand} onChange={(brand) => save({ brand })} />
+          <Section title="Marca" aside={!whiteLabel ? <LockBadge label={availableIn("personalizado")} /> : undefined}>
+            {whiteLabel ? (
+              <div className="space-y-3">
+                <ColorField label="Cor principal" value={draft.brandColor ?? "#4B5320"} onChange={(brandColor) => save({ brandColor })} />
+                <Checkbox label="Ocultar a marca VYZ (dashboard, link e PDF)" checked={draft.hideVyz} onChange={(hideVyz) => save({ hideVyz })} />
+                {draft.brandColor && (
+                  <button type="button" className={`${btn.ghost} h-8 px-2 text-[13px]`} onClick={() => save({ brandColor: null })}>
+                    Usar a cor do workspace
+                  </button>
+                )}
+                <p className="text-[12.5px] text-fg-2">O logo é o do workspace (Configurações).</p>
+              </div>
             ) : (
               <div className="flex flex-col gap-3 text-[14px] sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-fg-2">Seu logo e suas cores no dashboard, no link e no PDF, sem a marca VYZ.</p>
-                <a href={waLink(msgUpgrade(TIER_LABEL[ws.tier], "Personalizado", "Quero a marca própria."))} target="_blank" rel="noopener noreferrer" className={`${btn.small} shrink-0`}>
-                  <WhatsAppIcon size={16} /> Fazer upgrade
-                </a>
+                <Link href="/painel/plano" className={`${btn.small} shrink-0`}>
+                  Ver planos
+                </Link>
               </div>
             )}
           </Section>
@@ -349,44 +394,42 @@ export function NewDashboardFlow() {
       )}
 
       {t && step === 5 && (
-        <Section title="Revisar e gerar">
+        <Section title={editing ? "Revisar e salvar" : "Revisar e gerar"}>
           <dl className="grid gap-x-6 gap-y-3 text-[14px] sm:grid-cols-2">
             <Info label="Template" value={t.name} />
-            <Info label="Dashboard" value={`${draft.name?.trim() || t.name} · ${draft.client?.trim() || "Cliente"}`} />
+            <Info label="Dashboard" value={[draft.name.trim() || t.name, draft.client.trim()].filter(Boolean).join(" · ")} />
             <Info
               label="Contas"
-              value={
-                t.sources
-                  .map((s) => {
-                    const a = accounts.find((x) => x.id === draft.accounts?.[s]);
-                    return `${PLATFORMS[s].short}: ${a ? a.name : "sem conta (amostra)"}`;
-                  })
-                  .join(" · ") || "—"
-              }
+              value={live ? platformSources.filter((s) => draft.accountIds.includes(s.id)).map((s) => s.name).join(", ") || "nenhuma" : "dados de exemplo"}
             />
-            <Info label="Páginas" value={pages.map((p) => PAGES[p].name).join(", ")} />
-            <Info label={isLeadProfile ? "Meta de CPL" : "Meta de CPA"} value={settings.goal ? brl(settings.goal, { decimals: false }) : "automática"} />
-            <Info label="Margem e equilíbrio" value={`${Math.round(settings.margin * 100)}% · ROAS ${(1 / settings.margin).toFixed(1).replace(".", ",")}`} />
-            <Info label="Verba mensal" value={settings.budget ? brl(settings.budget, { decimals: false }) : "automática"} />
-            <Info label="Período e atribuição" value={`${PERIODS.find((p) => p.value === settings.period)?.label} · ${ATTRIBUTIONS.find((a) => a.value === settings.attribution)?.label}`} />
+            <Info label="Páginas" value={draft.pages.map((p) => PAGES[p].name).join(", ") || "nenhuma"} />
+            <Info label={isLeadProfile ? "Meta de CPL" : "Meta de CPA"} value={draft.goal ? brl(draft.goal, { decimals: false }) : "automática"} />
+            <Info label="Margem e equilíbrio" value={draft.margin ? `${Math.round(draft.margin * 100)}% · ROAS ${roas(draft.margin)}` : "sem margem · ROAS 1"} />
+            <Info label="Verba mensal" value={draft.budget ? brl(draft.budget, { decimals: false }) : "automática"} />
+            <Info label="Período e atribuição" value={`${PERIODS.find((p) => p.value === draft.period)?.label} · ${ATTRIBUTIONS.find((a) => a.value === draft.attribution)?.label}`} />
           </dl>
+          {!live && (
+            <div className="mt-4">
+              <PendingChip label="Modelo com dados de exemplo" detail="Os números são fictícios. Para os números das suas contas, use um template com dados reais (Meta Ads ou Google Ads · E-commerce)." />
+            </div>
+          )}
           {atLimit ? (
             <div className="mt-5 flex flex-col gap-3 rounded-control border border-warning/60 bg-warning/10 p-4 text-[14px] sm:flex-row sm:items-center sm:justify-between">
               <p>
-                O plano {TIER_LABEL[ws.tier]} permite {ent.maxDashboards} dashboards e você já tem {dashboards.length}.
+                O plano {TIER_LABEL[tier]} permite {limit} dashboards e você já tem {used}.
               </p>
-              <a href={waLink(msgUpgrade(TIER_LABEL[ws.tier], "um plano maior", "Preciso de mais dashboards."))} target="_blank" rel="noopener noreferrer" className={`${btn.small} shrink-0`}>
-                <WhatsAppIcon size={16} /> Fazer upgrade
-              </a>
+              <Link href="/painel/plano" className={`${btn.small} shrink-0`}>
+                Trocar de plano
+              </Link>
             </div>
           ) : (
-            <div className="relative mt-6 overflow-hidden rounded-card">
-              <button type="button" onClick={generate} disabled={generating} className={`${btn.primary} w-full sm:w-auto`}>
-                {generating ? "Gerando…" : editing ? "Salvar e abrir" : "Gerar dashboard"}
+            <div className="mt-6">
+              <button type="button" onClick={submit} disabled={pending || accountsMissing || draft.pages.length === 0} className={`${btn.primary} w-full sm:w-auto`}>
+                {pending ? (editing ? "Salvando…" : "Gerando…") : editing ? "Salvar e abrir" : "Gerar dashboard"}
               </button>
             </div>
           )}
-          {generating && (
+          {pending && !editing && (
             <div className="relative mt-4 h-24 overflow-hidden rounded-card border border-line bg-bg" data-anim="on" aria-hidden>
               <div className="scanner" />
               <div className="m-unveil grid h-full grid-cols-4 gap-2 p-3">
@@ -399,21 +442,51 @@ export function NewDashboardFlow() {
         </Section>
       )}
 
+      {error && (
+        <p role="alert" className="rounded-control bg-error-soft px-3 py-2 text-[13.5px] text-error-fg">
+          {error.message}
+        </p>
+      )}
+
       {t && step > 1 && (
-        <div className="flex items-center justify-between gap-3">
-          <button type="button" onClick={() => go(step - 1)} className={`${btn.ghost} h-10`}>
-            <ArrowLeft size={16} aria-hidden /> Voltar
-          </button>
-          {step < 5 && (
-            <button type="button" onClick={() => go(step + 1)} disabled={step === 3 && pages.length === 0} className={btn.small}>
-              Continuar <ArrowRight size={16} aria-hidden />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {step > firstStep ? (
+            <button type="button" onClick={() => go(step - 1)} className={`${btn.ghost} h-10`}>
+              <ArrowLeft size={16} aria-hidden /> Voltar
             </button>
+          ) : editing ? (
+            <Link href={`/painel/dashboards/${dashboard.id}`} className={`${btn.ghost} h-10`}>
+              <ArrowLeft size={16} aria-hidden /> Cancelar
+            </Link>
+          ) : (
+            <span />
           )}
+          <div className="flex flex-wrap gap-2">
+            {editing && step < 5 && (
+              <button type="button" onClick={submit} disabled={pending || accountsMissing || draft.pages.length === 0} className={`${btn.ghost} h-10`}>
+                {pending ? "Salvando…" : "Salvar agora"}
+              </button>
+            )}
+            {step < 5 && (
+              <button type="button" onClick={() => go(step + 1)} disabled={!canContinue} className={btn.small}>
+                Continuar <ArrowRight size={16} aria-hidden />
+              </button>
+            )}
+          </div>
         </div>
       )}
-      {t && <p className="text-[12px] text-fg-2">O progresso fica salvo neste navegador a cada passo.</p>}
     </div>
   );
+}
+
+/** Template escolhido: páginas que o plano libera e, nos de dados reais, as contas ativas da plataforma. */
+function withTemplate(d: Draft, t: DashboardTemplate, pagesTier: Tier, sources: SourceOption[]): Draft {
+  return {
+    ...d,
+    templateId: t.id,
+    pages: defaultPages(t, pagesTier),
+    accountIds: isLiveTemplate(t.id) ? sources.filter((s) => s.isEnabled && t.sources.includes(s.platformId)).map((s) => s.id) : [],
+  };
 }
 
 function Info({ label, value }: { label: string; value: string }) {

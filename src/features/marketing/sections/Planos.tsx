@@ -2,17 +2,17 @@
 
 import { ArrowRight, Check } from "lucide-react";
 import { useInView } from "motion/react";
+import Link from "next/link";
 import { useRef, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { CutReveal } from "@/components/motion/CutReveal";
 import { Odometer } from "@/components/ui/Odometer";
 import { Reveal } from "@/components/motion/Reveal";
 import { SectionWipe } from "@/components/motion/SectionWipe";
-import { scrollToId } from "@/components/motion/SmoothScroll";
 import { usePlan } from "@/features/marketing/state/PlanProvider";
 import { Segmented } from "@/components/ui/Segmented";
 import { btn } from "@/components/ui/styles";
 import { brl } from "@/lib/format";
-import { ANNUAL_SAVING_PCT, EXTRA_ACCOUNT, PRO_TRACKING_VALUE, startingPrice, type PlanId } from "@/features/pricing/pricing";
+import { ANNUAL_SAVING_PCT, EXTRA_ACCOUNT, PRO_TRACKING_VALUE, startingPrice, toQuery, type PlanId } from "@/features/pricing/pricing";
 import { MSG_OVER_30, MSG_WHITE_LABEL, waLink } from "@/lib/whatsapp";
 import { templateCountsLabel } from "@/features/pricing/entitlements";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
@@ -69,7 +69,7 @@ type PlanCardProps = {
 };
 
 function PlanCard({ id, name, pitch, features, footer, cta, featured, badge, top, extra, delay, className = "" }: PlanCardProps) {
-  const { state, update } = usePlan();
+  const { state } = usePlan();
   const price = startingPrice(id, state.periodo);
 
   function spotlight(e: PointerEvent<HTMLElement>) {
@@ -136,17 +136,14 @@ function PlanCard({ id, name, pitch, features, footer, cta, featured, badge, top
 
           <p className={`mt-6 border-t pt-4 text-[13px] leading-relaxed ${featured ? "border-current/20" : "border-line text-fg-2"}`}>{footer}</p>
 
-          <button
-            type="button"
-            onClick={() => {
-              update({ plano: id });
-              scrollToId("monte-seu-plano");
-            }}
+          {/* o checkout leva a seleção atual (contas e extras do Monte seu plano) com este plano */}
+          <Link
+            href={`/assinar?${toQuery({ ...state, plano: id })}`}
             className={`${featured ? "bg-on-accent text-accent hover:opacity-90" : "bg-accent text-on-accent hover:opacity-90"} mt-5 inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-control font-semibold transition-[opacity,transform] duration-200 active:scale-[0.98]`}
           >
             {cta}
             <ArrowRight size={17} aria-hidden />
-          </button>
+          </Link>
         </div>
       </article>
     </Reveal>
@@ -201,7 +198,7 @@ export function Planos() {
               "Link compartilhável e exportação em PDF",
             ]}
             footer={`Conta a mais: ${extra("base")} · Dashboard adicional: R$ 99`}
-            cta="Montar com o Base"
+            cta="Assinar o Base"
           />
           <PlanCard
             id="pro"
@@ -225,7 +222,7 @@ export function Planos() {
               </p>
             }
             footer={`Conta a mais: ${extra("pro")}`}
-            cta="Montar com o Pro"
+            cta="Assinar o Pro"
           />
           <PlanCard
             id="avancado"
@@ -236,7 +233,7 @@ export function Planos() {
             pitch="Tudo do Pro, com análise por áudio em tempo real."
             features={["Tudo do Pro", "Dashboard com análise por áudio: pergunte em voz alta e ouça a leitura dos números, em tempo real"]}
             footer="Conta a mais: igual ao Pro · a análise por áudio não tem desconto no anual"
-            cta="Montar com o Avançado"
+            cta="Assinar o Avançado"
           />
         </div>
 

@@ -1,15 +1,16 @@
 "use client";
 
 // Estado do assistente VYZ: conversa (só na memória desta aba), abrir/fechar
-// (botão, barra e ⌘K/Ctrl+K), pergunta → motor → ação, digitação simulada,
-// voz (só nos planos com agentVoice) e o "Mostrar no painel".
+// (botão, barra e ⌘K/Ctrl+K), pergunta → contexto do servidor → motor →
+// ação, digitação simulada, voz (só nos planos com agentVoice) e o "Mostrar
+// no painel".
 
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { setTheme } from "@/components/ui/ThemeToggle";
 import { useWorkspace } from "@/features/workspace/workspace";
-import { buildContext } from "./engine/context";
-import { createEngine, type AgentAnswer, type AgentTarget } from "./engine";
+import { getAgentContext } from "@/server/agent/actions";
+import { createEngine, type AgentAnswer, type AgentContext, type AgentTarget, type VyzEngine } from "./engine";
 import type { MascotState } from "./Mascot";
 import { listen, speak, stripWakeWord } from "./voice";
 
@@ -41,6 +42,19 @@ export function useAgent() {
   const v = useContext(Ctx);
   if (!v) throw new Error("useAgent fora do AgentProvider");
   return v;
+}
+
+/** Contexto do servidor (plano, uso e números dos dashboards) e a resposta do motor. */
+async function answerFor(engine: VyzEngine, question: string): Promise<AgentAnswer> {
+  let result: Awaited<ReturnType<typeof getAgentContext>>;
+  try {
+    result = await getAgentContext();
+  } catch {
+    result = { ok: false, error: { code: "unknown", message: "Não consegui falar com o servidor. Confira a conexão e tente de novo." } };
+  }
+  if (!result.ok) return { text: result.error.message, spoken: result.error.message, understood: false };
+  const ctx: AgentContext = result.data;
+  return engine.ask(question, ctx);
 }
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -102,7 +116,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     [silence],
   );
 
-  // plano sem voz (troca no seletor do modo demonstração): corta na hora
+  // plano sem voz (ex.: trocou para um plano menor): corta na hora
   useEffect(() => {
     if (voiceAllowed) return;
     stopMic.current();
@@ -166,9 +180,11 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       const userId = nextId.current++;
       setMessages((ms) => [...ms, { id: userId, role: "user", text: q, shown: q.length }]);
       setBusy(true);
-      const answer = await engine.ask(q, buildContext());
-      // um respiro de "pensando" (o motor local responde na hora)
-      await new Promise((r) => window.setTimeout(r, reduced() ? 0 : 350));
+      const t0 = performance.now();
+      const answer = await answerFor(engine, q);
+      // um respiro mínimo de "pensando" (o motor local responde na hora)
+      const wait = reduced() ? 0 : Math.max(0, 350 - (performance.now() - t0));
+      if (wait) await new Promise((r) => window.setTimeout(r, wait));
       const id = nextId.current++;
       setMessages((ms) => [...ms, { id, role: "vyz", text: answer.text, answer, shown: 0 }]);
       runAction(answer);

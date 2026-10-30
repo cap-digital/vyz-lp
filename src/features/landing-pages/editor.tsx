@@ -12,8 +12,8 @@ import { btn } from "@/components/ui/styles";
 import { LANDING_SECTIONS, SECTION_LABEL, type LandingContent, type LandingSection, type LandingTemplate } from "@/features/templates/landing-pages";
 import type { Tracking } from "@/features/workspace/types";
 import { useWorkspace } from "@/features/workspace/workspace";
-import { slugify } from "@/lib/ids";
 import { LandingRenderer } from "./LandingRenderer";
+import { cleanSlug, LIMITS } from "./model";
 import { normalizeTracking, TRACKING_FIELDS, validateTracking } from "./tracking";
 
 /** Seções que o template sabe preencher. */
@@ -36,37 +36,52 @@ const maskPhone = (raw: string) => {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`;
 };
 
-export function ContentFields({ t, value, onChange }: { t: LandingTemplate; value: LandingContent; onChange: (v: LandingContent) => void }) {
+/** Logo enviado pelo servidor (editor). Sem isto, o logo fica no rascunho local como dataURL. */
+export type LogoUpload = { onFile: (f: File) => Promise<string | null>; onRemove: () => Promise<string | null> };
+
+export function ContentFields({ t, value, onChange, logo }: { t: LandingTemplate; value: LandingContent; onChange: (v: LandingContent) => void; logo?: LogoUpload }) {
   const set = (patch: Partial<LandingContent>) => onChange({ ...value, ...patch });
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const run = async (task: () => Promise<string | null>) => {
+    setLogoBusy(true);
+    setLogoError(await task());
+    setLogoBusy(false);
+  };
   return (
     <div className="space-y-5">
       <fieldset className="space-y-3">
         <legend className="mb-1 text-[13px] font-semibold text-fg-2">Marca</legend>
-        <TextField label="Nome da marca" value={value.brand} onChange={(brand) => set({ brand })} placeholder="Loja Verde" />
+        <TextField label="Nome da marca" value={value.brand} onChange={(brand) => set({ brand: brand.slice(0, LIMITS.brand) })} placeholder="Loja Verde" />
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start">
           <FileInput
             label="Logo"
-            hint="PNG, JPG, SVG ou WebP, até 300 KB"
-            accept="image/png,image/jpeg,image/svg+xml,image/webp"
+            hint={logoBusy ? "Enviando…" : logo ? "PNG, JPG ou WebP, até 2 MB" : "PNG, JPG ou WebP, até 300 KB"}
+            accept="image/png,image/jpeg,image/webp"
             error={logoError}
             compact
-            onFile={(f) =>
+            onFile={(f) => {
+              if (logo) return void run(() => logo.onFile(f));
               readImage(
                 f,
                 300_000,
-                (logo) => {
+                (dataUrl) => {
                   setLogoError(null);
-                  set({ logo });
+                  set({ logo: dataUrl });
                 },
                 setLogoError,
-              )
-            }
+              );
+            }}
           />
           <ColorField label="Cor principal" value={value.color} onChange={(color) => set({ color })} />
         </div>
         {value.logo && (
-          <button type="button" onClick={() => set({ logo: undefined })} className={`${btn.ghost} h-8 px-2 text-[13px]`}>
+          <button
+            type="button"
+            disabled={logoBusy}
+            onClick={() => (logo ? void run(logo.onRemove) : set({ logo: undefined }))}
+            className={`${btn.ghost} h-8 px-2 text-[13px]`}
+          >
             Remover logo
           </button>
         )}
@@ -149,7 +164,7 @@ export function TrackingFields({ value, onChange }: { value: Tracking; onChange:
           onChange={(v) => onChange({ ...value, [f.key]: normalizeTracking(f.key, v) })}
         />
       ))}
-      <PendingChip label="Teste do disparo precisa de publicação" detail="Com a página no ar, o time confere se GTM, Pixel e conversões disparam. No preview, as tags não rodam." />
+      <PendingChip label="Tags só na página publicada" detail="Na prévia e no editor as tags não rodam. Com a página no ar, confira o disparo no modo de visualização do GTM e no Pixel Helper." />
     </div>
   );
 }
@@ -158,15 +173,16 @@ export function trackingValid(t: Tracking): boolean {
   return TRACKING_FIELDS.every((f) => validateTracking(f.key, t[f.key]) === null);
 }
 
-export function SlugField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function SlugField({ value, onChange, error, hint }: { value: string; onChange: (v: string) => void; error?: string | null; hint?: string }) {
   return (
     <TextField
-      label="Endereço (subdomínio)"
+      label="Endereço da página"
       value={value}
-      suffix=".vyz.app"
-      placeholder="lojaverde"
-      hint="Só letras minúsculas, números e hífen."
-      onChange={(v) => onChange(slugify(v, "-"))}
+      prefix="/p/"
+      placeholder="loja-verde"
+      error={error ?? undefined}
+      hint={hint ?? "Letras minúsculas, números e hífen."}
+      onChange={(v) => onChange(cleanSlug(v))}
     />
   );
 }

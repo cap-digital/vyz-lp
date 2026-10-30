@@ -267,6 +267,17 @@ export const PAGES: Record<PageId, PageDef> = {
     description: "Uma página para a diretoria: quatro números e a tendência.",
     build: (ctx) => OVERVIEW.executivo(ctx),
   },
+  termos: {
+    id: "termos",
+    name: "Termos de pesquisa",
+    tier: "pro",
+    templateOnly: true,
+    description: "O que as pessoas buscaram antes de clicar, com custo e conversões.",
+    build: () => ({
+      kpis: [{ metric: "clicks", sub: "delta" }, { metric: "cpc", sub: "delta" }, { metric: "conversions", sub: "delta" }, { metric: "cpa", sub: "delta", highlight: true }],
+      widgets: [{ type: "table", source: "campaigns", span: 4, title: "Campanhas de pesquisa" }],
+    }),
+  },
 };
 
 /** Páginas que aparecem na biblioteca do fluxo, por nível. */

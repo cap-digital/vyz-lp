@@ -1,83 +1,92 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Modal, PendingChip, SelectField, TextField } from "@/components/ui/kit";
 import { btn } from "@/components/ui/styles";
-import type { Dashboard, Report } from "@/features/workspace/types";
-import { newId } from "@/lib/ids";
-import { store } from "@/lib/store/store";
+import { createScheduledReport } from "@/server/share/actions";
+import { FORMAT_LABEL, scheduleLabel, WEEKDAYS, type ReportFormat, type ReportFrequency } from "./schedule";
 
-export const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const HOURS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `${String(h).padStart(2, "0")}:00` }));
 
-export function reportWhen(r: Pick<Report, "frequency" | "day">): string {
-  return r.frequency === "semanal" ? `Toda ${WEEKDAYS[r.day].toLowerCase()}` : `Todo dia ${r.day}`;
-}
-
-/** Relatório agendado: salvo localmente; o envio depende de backend. */
-export function ReportModal({ open, onClose, dashboard }: { open: boolean; onClose: () => void; dashboard: Dashboard }) {
-  const [frequency, setFrequency] = useState<Report["frequency"]>("semanal");
+/** Agenda o envio do dashboard. Fica gravado no servidor; o envio automático ainda está pendente. */
+export function ReportModal({ open, onClose, dashboard }: { open: boolean; onClose: () => void; dashboard: { id: string; name: string } }) {
+  const [frequency, setFrequency] = useState<ReportFrequency>("weekly");
   const [day, setDay] = useState(1);
-  const [format, setFormat] = useState<Report["format"]>("pdf");
+  const [sendHour, setSendHour] = useState(8);
+  const [format, setFormat] = useState<ReportFormat>("pdf");
   const [recipients, setRecipients] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
 
   function save() {
-    const r: Report = { id: newId("rp_"), dashboardId: dashboard.id, dashboardName: dashboard.name, frequency, day, format, recipients: recipients.trim(), createdAt: new Date().toISOString() };
-    store.put("reports", r);
-    setSaved(true);
+    setError(null);
+    start(async () => {
+      const r = await createScheduledReport({ dashboardId: dashboard.id, frequency, day, sendHour, format, recipients });
+      if (!r.ok) return setError(r.error.fields?.recipients ?? r.error.message);
+      setSaved(scheduleLabel({ frequency, weekday: frequency === "weekly" ? day : null, monthDay: frequency === "monthly" ? day : null, sendHour }));
+      setRecipients("");
+    });
+  }
+
+  function close() {
+    onClose();
+    setSaved(null);
+    setError(null);
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={() => {
-        onClose();
-        setSaved(false);
-      }}
-      title="Agendar relatório"
-    >
+    <Modal open={open} onClose={close} title="Agendar relatório">
       <div className="space-y-4 text-[14px]">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <p className="text-fg-2">
+          Envio periódico de <strong className="text-fg">{dashboard.name}</strong>.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
           <SelectField
             label="Frequência"
             value={frequency}
             onChange={(v) => {
-              setFrequency(v as Report["frequency"]);
+              setFrequency(v as ReportFrequency);
               setDay(1);
             }}
             options={[
-              { value: "semanal", label: "Semanal" },
-              { value: "mensal", label: "Mensal" },
+              { value: "weekly", label: "Semanal" },
+              { value: "monthly", label: "Mensal" },
             ]}
           />
           <SelectField
             label="Dia"
             value={String(day)}
             onChange={(v) => setDay(Number(v))}
-            options={frequency === "semanal" ? WEEKDAYS.map((w, i) => ({ value: String(i), label: w })) : Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: `Dia ${i + 1}` }))}
+            options={frequency === "weekly" ? WEEKDAYS.map((w, i) => ({ value: String(i), label: w })) : Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: `Dia ${i + 1}` }))}
           />
+          <SelectField label="Horário" value={String(sendHour)} onChange={(v) => setSendHour(Number(v))} options={HOURS} />
         </div>
         <SelectField
           label="Formato"
           value={format}
-          onChange={(v) => setFormat(v as Report["format"])}
-          options={[
-            { value: "pdf", label: "PDF por e-mail" },
-            { value: "whatsapp", label: "Resumo no WhatsApp" },
-          ]}
+          onChange={(v) => setFormat(v as ReportFormat)}
+          options={(["pdf", "whatsapp"] as const).map((f) => ({ value: f, label: FORMAT_LABEL[f] }))}
         />
-        <TextField label="Destinatários" value={recipients} onChange={setRecipients} placeholder={format === "pdf" ? "cliente@empresa.com, gestor@agencia.com" : "71 99999-0000"} hint="Separe por vírgula." />
+        <TextField
+          label="Destinatários"
+          value={recipients}
+          onChange={setRecipients}
+          error={error}
+          placeholder={format === "pdf" ? "cliente@empresa.com, gestor@agencia.com" : "71 99999-0000"}
+          hint={format === "pdf" ? "E-mails separados por vírgula (até 10)." : "WhatsApp com DDD, separados por vírgula (até 10)."}
+        />
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" onClick={save} disabled={!recipients.trim()} className={btn.small}>
-            Salvar agendamento
+          <button type="button" onClick={save} disabled={pending || !recipients.trim()} className={btn.small}>
+            {pending ? "Salvando…" : "Salvar agendamento"}
           </button>
           {saved && (
             <span className="text-[13px] text-accent" role="status">
-              Salvo · {reportWhen({ frequency, day })}
+              Agendado · {saved}
             </span>
           )}
         </div>
-        <PendingChip label="Envio agendado precisa de backend" detail="O agendamento fica salvo neste navegador. O envio automático entra quando houver servidor." />
+        <PendingChip label="Envio automático pendente" detail="O agendamento fica salvo e aparece em Compartilhar. O envio por e-mail e WhatsApp entra quando o serviço de envio estiver ligado." />
       </div>
     </Modal>
   );

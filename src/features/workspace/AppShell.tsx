@@ -4,25 +4,29 @@
 // arredondado. A aba ativa usa a cor do painel e se funde nele pelos cantos
 // côncavos (.side-tab no globals.css); um único indicador desliza entre os
 // itens (layoutId). A sidebar recolhe com o botão ou com "[", e o estado
-// fica no <html data-sidebar>, aplicado antes da primeira pintura.
+// fica no <html data-sidebar>, aplicado antes da primeira pintura. O topo
+// mostra o plano real da sessão e, quando há, o aviso da assinatura.
 
-import { BarChart3, ChevronsUpDown, Gem, Home, LogOut, Menu, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Plug, Settings, Share2 } from "lucide-react";
+import { AlertTriangle, BarChart3, Check, ChevronsUpDown, Gem, Home, Info, LogOut, Menu, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Plug, Settings, Share2 } from "lucide-react";
 import { LazyMotion, m, MotionConfig } from "motion/react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Suspense, useEffect, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Modal, PendingChip } from "@/components/ui/kit";
-import { Menu as DropMenu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/Menu";
-import { Segmented } from "@/components/ui/Segmented";
+import { Menu as DropMenu, MenuCheckItem, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/components/ui/Menu";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Tooltip, TooltipProvider } from "@/components/ui/Tooltip";
 import { AgentDrawer } from "@/features/agent/AgentDrawer";
 import { AgentBar, AgentFab } from "@/features/agent/AgentEntry";
 import { AgentProvider } from "@/features/agent/AgentProvider";
 import { Caption } from "@/features/agent/Caption";
-import { TIER_LABEL, TIERS, type Tier } from "@/features/pricing/entitlements";
-import { useWorkspace } from "./workspace";
+import { TIER_LABEL } from "@/features/pricing/entitlements";
+import { signOut } from "@/server/auth/actions";
+import { switchWorkspace } from "@/server/workspace/actions";
+import { subscriptionNotice } from "./notice";
+import { ROLE_LABEL } from "./session";
+import { useWorkspaceSession } from "./WorkspaceProvider";
 
 const NAV = [
   { href: "/painel", label: "Início", icon: Home },
@@ -123,11 +127,19 @@ const initials = (name: string) =>
     .map((w) => w[0]?.toUpperCase())
     .join("") || "V";
 
-/** Cartão do workspace com o próprio menu (Configurações e Sair). Recolhido, vira avatar. */
+/** "Pro · 2 contas" ou "Sem plano ativo". */
+function planLine(access: ReturnType<typeof useWorkspaceSession>["access"]) {
+  if (!access.hasAccess || !access.tier) return "Sem plano ativo";
+  const n = access.accountsQuantity;
+  return `${TIER_LABEL[access.tier]} · ${n} ${n === 1 ? "conta" : "contas"}`;
+}
+
+/** Cartão do workspace com o próprio menu (trocar de workspace, Configurações e Sair). Recolhido, vira avatar. */
 function WorkspaceMenu({ collapsed }: { collapsed: boolean }) {
-  const { ws } = useWorkspace();
+  const { workspace: ws, access, memberships } = useWorkspaceSession();
   const router = useRouter();
-  const sub = `${TIER_LABEL[ws.tier]} · ${ws.contractedAccounts} ${ws.contractedAccounts === 1 ? "conta" : "contas"}`;
+  const [switching, startSwitch] = useTransition();
+  const sub = switching ? "Abrindo…" : planLine(access);
   return (
     <DropMenu>
       <Tooltip content={ws.name} disabled={!collapsed}>
@@ -146,11 +158,30 @@ function WorkspaceMenu({ collapsed }: { collapsed: boolean }) {
         </MenuTrigger>
       </Tooltip>
       <MenuContent side={collapsed ? "right" : "top"} align={collapsed ? "end" : "start"} className={collapsed ? "" : "w-[var(--radix-dropdown-menu-trigger-width)]"}>
+        {memberships.length > 1 && (
+          <>
+            <MenuLabel>Workspaces</MenuLabel>
+            {memberships.map((m) => (
+              <MenuCheckItem
+                key={m.id}
+                checked={m.id === ws.id}
+                disabled={switching}
+                onSelect={() => {
+                  if (m.id !== ws.id) startSwitch(() => switchWorkspace(m.id));
+                }}
+              >
+                <span className="min-w-0 flex-1 truncate">{m.name}</span>
+                <span className="ml-3 shrink-0 text-[11.5px] text-fg-2">{ROLE_LABEL[m.role]}</span>
+              </MenuCheckItem>
+            ))}
+            <MenuSeparator />
+          </>
+        )}
         <MenuItem icon={<Settings size={15} />} onSelect={() => router.push("/painel/configuracoes")}>
           Configurações
         </MenuItem>
         <MenuSeparator />
-        <MenuItem icon={<LogOut size={15} />} onSelect={() => router.push("/entrar")}>
+        <MenuItem icon={<LogOut size={15} />} onSelect={() => void signOut()}>
           Sair
         </MenuItem>
       </MenuContent>
@@ -238,34 +269,88 @@ function ActiveBottomNav({ onMore }: { onMore: () => void }) {
 
 // ---- topo do painel ------------------------------------------------------------
 
-/** Seletor de plano simulado: serve para testar os bloqueios sem backend. */
-export function PlanSimulator({ compact = false }: { compact?: boolean }) {
-  const { ws, update } = useWorkspace();
+/** No celular não há sidebar: a troca de workspace fica no "Mais". */
+function MobileWorkspaces() {
+  const { workspace: ws, memberships } = useWorkspaceSession();
+  const [switching, startSwitch] = useTransition();
+  if (memberships.length < 2) return null;
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      {!compact && <span className="text-[13px] text-fg-2">Simular plano</span>}
-      <Segmented<Tier> label="Simular plano" size="sm" value={ws.tier} onChange={(tier) => update({ tier })} options={TIERS.map((t) => ({ value: t, label: TIER_LABEL[t] }))} />
-      <PendingChip
-        label={compact ? "Simulado" : "Precisa conectar Supabase"}
-        detail="Precisa conectar Supabase · o plano real virá da conta. Por enquanto, escolha um plano para testar os limites e os bloqueios."
-      />
+    <li className="border-y border-line py-1">
+      <p className="px-3 pt-2 pb-1 text-[11.5px] font-medium tracking-[0.06em] text-fg-2 uppercase">Workspaces</p>
+      <ul>
+        {memberships.map((m) => (
+          <li key={m.id}>
+            <button
+              type="button"
+              disabled={switching}
+              aria-current={m.id === ws.id ? "true" : undefined}
+              onClick={(e) => {
+                if (m.id === ws.id) return;
+                e.stopPropagation();
+                startSwitch(() => switchWorkspace(m.id));
+              }}
+              className="flex w-full items-center gap-3 rounded-control px-3 py-3 text-left text-[15px] hover:bg-accent-soft disabled:opacity-50"
+            >
+              <span className="inline-flex w-[18px] justify-center text-accent">{m.id === ws.id && <Check size={17} aria-hidden />}</span>
+              <span className="min-w-0 flex-1 truncate">{m.name}</span>
+              <span className="text-[12px] text-fg-2">{switching && m.id !== ws.id ? "…" : ROLE_LABEL[m.role]}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </li>
+  );
+}
+
+/** Plano da sessão no topo (link para Plano) e o selo do pagamento simulado. */
+function PlanBadge({ simulatedBilling }: { simulatedBilling: boolean }) {
+  const { access } = useWorkspaceSession();
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <Link
+        href="/painel/plano"
+        className="inline-flex min-w-0 items-center gap-1.5 rounded-chip bg-accent-soft px-2.5 py-1 text-[12px] font-medium whitespace-nowrap text-fg outline-none hover:bg-[color-mix(in_srgb,var(--accent-soft)_80%,var(--accent))] focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        <span className={`size-1.5 shrink-0 rounded-full ${access.hasAccess ? "bg-accent" : "bg-error"}`} aria-hidden />
+        <span className="truncate">{planLine(access)}</span>
+      </Link>
+      {simulatedBilling && (
+        <PendingChip
+          className="max-sm:hidden"
+          label="Pagamento simulado"
+          detail="A cobrança ainda é simulada: nenhum valor é cobrado. A cobrança real entra com a Stripe."
+        />
+      )}
     </div>
   );
 }
 
-/** Lembra que o painel é uma demonstração: nada sai deste navegador. */
-function DemoChip() {
+const NOTICE_STYLE = {
+  error: "bg-error-soft text-fg [&_svg]:text-error-fg",
+  warn: "bg-[color-mix(in_srgb,var(--color-warning)_18%,var(--panel))] text-fg [&_svg]:text-[var(--color-warning)]",
+  info: "bg-accent-soft text-fg [&_svg]:text-accent",
+} as const;
+
+/** Faixa do topo: pagamento em atraso, cancelamento agendado ou assinatura inativa. */
+function SubscriptionBanner() {
+  const { access } = useWorkspaceSession();
+  const notice = subscriptionNotice(access);
+  if (!notice) return null;
+  const Icon = notice.tone === "info" ? Info : AlertTriangle;
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-chip bg-accent-soft px-2.5 py-1 text-[12px] font-medium whitespace-nowrap text-fg">
-      <span className="size-1.5 rounded-full bg-accent" aria-hidden />
-      <span>
-        Modo demonstração<span className="max-sm:hidden"> · dados neste navegador</span>
-      </span>
-    </span>
+    <div role={notice.tone === "info" ? "status" : "alert"} className={`border-t border-line px-4 py-2 text-[13px] sm:px-6 ${NOTICE_STYLE[notice.tone]}`}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Icon size={15} aria-hidden className="shrink-0" />
+        <p className="min-w-0 flex-1">{notice.text}</p>
+        <Link href={notice.action.href} className="shrink-0 font-semibold underline-offset-2 outline-none hover:underline focus-visible:underline">
+          {notice.action.label}
+        </Link>
+      </div>
+    </div>
   );
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, simulatedBilling = false }: { children: ReactNode; simulatedBilling?: boolean }) {
   const [more, setMore] = useState(false);
   return (
     <LazyMotion features={loadFeatures} strict>
@@ -281,13 +366,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <Link href="/painel" aria-label="VYZ, início do painel" className="block w-14 md:hidden">
                       <Wordmark decorative />
                     </Link>
-                    <div className="flex min-w-0 items-center gap-3">
-                      <DemoChip />
-                      {/* o simulador só entra no topo quando cabe numa linha (está também em Plano) */}
-                      <div className="hidden @[860px]:block">
-                        <PlanSimulator compact />
-                      </div>
-                    </div>
+                    <PlanBadge simulatedBilling={simulatedBilling} />
                     <div className="flex shrink-0 items-center gap-2">
                       <div className="hidden @[1100px]:block">
                         <AgentBar />
@@ -295,6 +374,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       <ThemeToggle className="size-9 shrink-0" />
                     </div>
                   </div>
+                  <SubscriptionBanner />
                 </header>
                 <main id="conteudo" className="mx-auto max-w-[1280px] px-4 pt-6 pb-36 sm:px-6 md:pb-28 print:max-w-none print:p-0">
                   {children}
@@ -315,15 +395,16 @@ export function AppShell({ children }: { children: ReactNode }) {
                       </Link>
                     </li>
                   ))}
+                  <MobileWorkspaces />
                   <li>
                     <Link href="/" className="flex items-center gap-3 rounded-control px-3 py-3 text-[15px] text-fg-2 hover:bg-accent-soft">
                       Voltar ao site
                     </Link>
                   </li>
                   <li>
-                    <Link href="/entrar" className="flex items-center gap-3 rounded-control px-3 py-3 text-[15px] text-fg-2 hover:bg-accent-soft">
+                    <button type="button" onClick={() => void signOut()} className="flex w-full items-center gap-3 rounded-control px-3 py-3 text-left text-[15px] text-fg-2 hover:bg-accent-soft">
                       <LogOut size={18} aria-hidden /> Sair
-                    </Link>
+                    </button>
                   </li>
                 </ul>
               </Modal>

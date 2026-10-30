@@ -47,6 +47,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // app nativo (Expo) tem o próprio lint
+    "apps/**",
   ]),
 ]);
 

@@ -12,6 +12,8 @@ const inter = Inter({
 // Raiz mínima: fonte, tokens e tema. Cada área ((marketing), (painel), (publico))
 // define os próprios metadados.
 export const metadata: Metadata = {
+  // domínio oficial (NEXT_PUBLIC_SITE_URL): URLs absolutas de Open Graph e links
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.vyzualize.com.br"),
   title: { default: "VYZ", template: "%s · VYZ" },
   applicationName: "VYZ",
   // TODO: remover no lançamento

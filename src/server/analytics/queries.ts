@@ -1,0 +1,287 @@
+import "server-only";
+
+// Leitura dos dashboards com dados reais (Meta Ads · E-commerce e Google Ads ·
+// E-commerce). Duas etapas:
+//   1. com o cliente de quem pede (RLS): o dashboard precisa ser visível e as
+//      contas ligadas a ele, ativas (ad_accounts.is_enabled), da plataforma do
+//      template. Daí sai o período (termina ontem no fuso da conta);
+//   2. uma função em cache ("use cache", sem cookies) lê do armazém com a chave
+//      de serviço SÓ essas contas e agrega. Tags: dashboard:<id> e
+//      insights:<conta> (a sincronização invalida esta ao terminar).
+// Ocultar investimento acontece depois do cache, antes de ir para o navegador.
+
+import { cacheLife, cacheTag } from "next/cache";
+import { z } from "zod";
+import { aggregateDashboard, redactSpend } from "@/features/analytics/aggregate";
+import { TEMPLATE_PLATFORM } from "@/features/analytics/preview";
+import { dashboardRanges, isPeriodId, maturingStart } from "@/features/analytics/ranges";
+import type {
+  AccountDayRow,
+  AdDayRow,
+  BreakdownDayRow,
+  CampaignDayRow,
+  DashboardView,
+  DateRange,
+  LiveAccount,
+  LiveDashboardData,
+  LivePlatform,
+  ProductDayRow,
+  SearchTermDayRow,
+  WarehouseRows,
+} from "@/features/analytics/types";
+import { DEFAULT_TIME_ZONE, localDate } from "@/features/sync/dates";
+import { insightsTag } from "@/features/sync/tags";
+import type { PeriodId } from "@/features/workspace/types";
+import { createAdminSupabase } from "@/server/supabase/admin";
+import { appError, fromPostgrest } from "@/server/supabase/errors";
+import { createServerSupabase, type DB } from "@/server/supabase/server";
+
+export type LoadLiveDashboardOptions = {
+  period: PeriodId;
+  /** Dias do período personalizado (3 a 60). */
+  customDays?: number;
+  /** Tira os valores de investimento antes de mandar para o navegador. */
+  hideSpend?: boolean;
+  /**
+   * Cliente que confere o acesso. Padrão: o da sessão (RLS). O link público
+   * passa o admin DEPOIS de validar o token; scripts de teste também.
+   */
+  db?: DB;
+};
+
+/** Tag de cache de um dashboard (editar fontes ou margem pode invalidar com ela). */
+export const dashboardTag = (dashboardId: string) => `dashboard:${dashboardId}`;
+
+const Uuid = z.uuid();
+
+export async function loadLiveDashboard(dashboardId: string, opts: LoadLiveDashboardOptions): Promise<LiveDashboardData> {
+  if (!Uuid.safeParse(dashboardId).success) throw appError("dashboard:not_found");
+  const db = opts.db ?? (await createServerSupabase());
+
+  const { data: dashboard, error } = await db.from("dashboards").select("id, name, client_name, template_id, margin").eq("id", dashboardId).maybeSingle();
+  if (error) throw fromPostgrest(error);
+  if (!dashboard) throw appError("dashboard:not_found");
+  const platform = TEMPLATE_PLATFORM[dashboard.template_id];
+  if (!platform) throw appError("dashboard:not_live", "Este dashboard não lê dados das contas conectadas.");
+
+  const { data: sources, error: sErr } = await db
+    .from("dashboard_sources")
+    .select("account:ad_accounts!dashboard_sources_workspace_id_ad_account_id_fkey(id, name, platform_id, currency, timezone, is_enabled, last_synced_at)")
+    .eq("dashboard_id", dashboardId);
+  if (sErr) throw fromPostgrest(sErr);
+  const accounts: LiveAccount[] = (sources ?? [])
+    .map((s) => s.account)
+    .filter((a): a is NonNullable<typeof a> => !!a && a.is_enabled && a.platform_id === platform)
+    .map((a) => ({ id: a.id, name: a.name, currency: a.currency, timeZone: a.timezone || DEFAULT_TIME_ZONE, lastSyncedAt: a.last_synced_at }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  const timeZone = accounts[0]?.timeZone ?? DEFAULT_TIME_ZONE;
+  const period: PeriodId = isPeriodId(opts.period) ? opts.period : "30d";
+  const { current, previous } = dashboardRanges(period, opts.customDays ?? 14, localDate(new Date(), timeZone));
+  const margin = dashboard.margin == null ? null : Number(dashboard.margin);
+  const breakEvenRoas = margin && margin > 0 ? Math.round((1 / margin) * 100) / 100 : null;
+
+  let view = accounts.length
+    ? await readWarehouse({ dashboardId, platform, accountIds: accounts.map((a) => a.id), current, previous, breakEvenRoas })
+    : aggregateDashboard(emptyRows(platform, current, previous), { breakEvenRoas });
+  if (opts.hideSpend) view = redactSpend(view);
+
+  return {
+    dashboard: { id: dashboard.id, name: dashboard.name, clientName: dashboard.client_name, templateId: dashboard.template_id },
+    platform,
+    status: !accounts.length ? "no_accounts" : view.hasData ? "ok" : "no_data",
+    accounts,
+    // contas de moedas diferentes não se somam com conversão: vale a primeira
+    currency: accounts[0]?.currency ?? "BRL",
+    timeZone,
+    current,
+    previous,
+    maturingFrom: maturingStart(current),
+    hideSpend: !!opts.hideSpend,
+    sample: false,
+    view,
+  };
+}
+
+// ---- leitura em cache ---------------------------------------------------------------------
+
+type WarehouseQuery = {
+  dashboardId: string;
+  platform: LivePlatform;
+  /** Ordenadas (a ordem entra na chave do cache). */
+  accountIds: string[];
+  current: DateRange;
+  previous: DateRange;
+  breakEvenRoas: number | null;
+};
+
+async function readWarehouse(q: WarehouseQuery): Promise<DashboardView> {
+  "use cache";
+  // fora do Next (scripts de teste) não há cache: as marcações só valem lá dentro
+  if (process.env.NEXT_RUNTIME) {
+    cacheTag(dashboardTag(q.dashboardId), ...q.accountIds.map(insightsTag));
+    cacheLife("hours");
+  }
+  const rows = await fetchRows(createAdminSupabase(), q);
+  return aggregateDashboard(rows, { breakEvenRoas: q.breakEvenRoas });
+}
+
+function emptyRows(platform: LivePlatform, current: DateRange, previous: DateRange): WarehouseRows {
+  return { platform, current, previous, accountDaily: [], campaigns: [], campaignDaily: [], ads: [], adDaily: [], breakdownDaily: [], searchTermDaily: [], products: [], productDaily: [] };
+}
+
+/** O PostgREST devolve no máximo 1000 linhas por pedido: busca em páginas (ordem estável). */
+const PAGE = 1000;
+
+type Paged<T> = (from: number, to: number) => PromiseLike<{ data: T[] | null; error: Parameters<typeof fromPostgrest>[0] | null }>;
+
+async function fetchAll<T>(page: Paged<T>): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) throw fromPostgrest(error);
+    out.push(...(data ?? []));
+    if (!data || data.length < PAGE) return out;
+  }
+}
+
+const num = (v: number | string | null | undefined) => (v == null ? 0 : Number(v));
+const opt = (v: number | string | null | undefined) => (v == null ? null : Number(v));
+
+const METRIC_COLUMNS =
+  "spend, impressions, reach, clicks, link_clicks, landing_page_views, add_to_cart, initiate_checkout, conversions, conversion_value, video_views, video_thruplays, search_impression_share, search_lost_is_budget, search_lost_is_rank";
+
+type MetricColumns = {
+  spend: number;
+  impressions: number;
+  reach: number | null;
+  clicks: number;
+  link_clicks: number | null;
+  landing_page_views: number | null;
+  add_to_cart: number | null;
+  initiate_checkout: number | null;
+  conversions: number;
+  conversion_value: number;
+  video_views: number | null;
+  video_thruplays: number | null;
+  search_impression_share: number | null;
+  search_lost_is_budget: number | null;
+  search_lost_is_rank: number | null;
+};
+
+const metricRow = (r: MetricColumns) => ({
+  spend: num(r.spend),
+  impressions: num(r.impressions),
+  reach: opt(r.reach),
+  clicks: num(r.clicks),
+  linkClicks: opt(r.link_clicks),
+  landingPageViews: opt(r.landing_page_views),
+  addToCart: opt(r.add_to_cart),
+  initiateCheckout: opt(r.initiate_checkout),
+  conversions: num(r.conversions),
+  conversionValue: num(r.conversion_value),
+  videoViews: opt(r.video_views),
+  videoThruplays: opt(r.video_thruplays),
+  searchImpressionShare: opt(r.search_impression_share),
+  searchLostIsBudget: opt(r.search_lost_is_budget),
+  searchLostIsRank: opt(r.search_lost_is_rank),
+});
+
+type BasicColumns = { spend: number; impressions: number; clicks: number; conversions: number; conversion_value: number };
+const basicRow = (r: BasicColumns) => ({ spend: num(r.spend), impressions: num(r.impressions), clicks: num(r.clicks), conversions: num(r.conversions), conversionValue: num(r.conversion_value) });
+
+const BASIC_COLUMNS = "spend, impressions, clicks, conversions, conversion_value";
+
+const BREAKDOWNS: Record<LivePlatform, string[]> = { meta: ["age_gender", "placement", "device", "region"], google: ["device", "hour"] };
+
+async function fetchRows(db: DB, q: WarehouseQuery): Promise<WarehouseRows> {
+  const ids = q.accountIds;
+  const { current: cur, previous: prev } = q;
+  const meta = q.platform === "meta";
+
+  const [accountDaily, campaigns, campaignDaily, ads, adDaily, breakdownDaily, searchTermDaily, products, productDaily] = await Promise.all([
+    // contas somadas por dia (mais de uma conta no mesmo dashboard)
+    fetchAll((a, b) =>
+      db.from("insights_account_daily").select(`ad_account_id, date, ${METRIC_COLUMNS}`).in("ad_account_id", ids).gte("date", prev.from).lte("date", cur.to).order("ad_account_id").order("date").range(a, b),
+    ).then((rows): AccountDayRow[] => rows.map((r) => ({ date: r.date, ...metricRow(r) }))),
+    fetchAll((a, b) => db.from("ad_campaigns").select("id, name, status, channel, funnel_stage, daily_budget").in("ad_account_id", ids).order("id").range(a, b)).then((rows) =>
+      rows.map((r) => ({ id: r.id, name: r.name, status: r.status, channel: r.channel, funnelStage: r.funnel_stage, dailyBudget: opt(r.daily_budget) })),
+    ),
+    fetchAll((a, b) =>
+      db.from("insights_campaign_daily").select(`campaign_id, date, ${METRIC_COLUMNS}`).in("ad_account_id", ids).gte("date", prev.from).lte("date", cur.to).order("campaign_id").order("date").range(a, b),
+    ).then((rows): CampaignDayRow[] => rows.map((r) => ({ campaignId: r.campaign_id, date: r.date, ...metricRow(r) }))),
+    meta
+      ? fetchAll((a, b) => db.from("ads").select("id, campaign_id, name, format, status, headline, thumbnail_url").in("ad_account_id", ids).order("id").range(a, b)).then((rows) =>
+          rows.map((r) => ({ id: r.id, campaignId: r.campaign_id, name: r.name, format: r.format, status: r.status, headline: r.headline, thumbnailUrl: r.thumbnail_url })),
+        )
+      : [],
+    meta
+      ? fetchAll((a, b) =>
+          db
+            .from("insights_ad_daily")
+            .select("ad_id, date, spend, impressions, reach, clicks, link_clicks, conversions, conversion_value, video_views, video_thruplays")
+            .in("ad_account_id", ids)
+            .gte("date", cur.from)
+            .lte("date", cur.to)
+            .order("ad_id")
+            .order("date")
+            .range(a, b),
+        ).then((rows): AdDayRow[] =>
+          rows.map((r) => ({
+            adId: r.ad_id,
+            date: r.date,
+            spend: num(r.spend),
+            impressions: num(r.impressions),
+            reach: opt(r.reach),
+            clicks: num(r.clicks),
+            linkClicks: opt(r.link_clicks),
+            conversions: num(r.conversions),
+            conversionValue: num(r.conversion_value),
+            videoViews: opt(r.video_views),
+            videoThruplays: opt(r.video_thruplays),
+          })),
+        )
+      : [],
+    fetchAll((a, b) =>
+      db
+        .from("insights_breakdown_daily")
+        .select(`date, dimension, value, ${BASIC_COLUMNS}`)
+        .in("ad_account_id", ids)
+        .in("dimension", BREAKDOWNS[q.platform])
+        .gte("date", cur.from)
+        .lte("date", cur.to)
+        .order("ad_account_id")
+        .order("date")
+        .order("dimension")
+        .order("value")
+        .range(a, b),
+    ).then((rows): BreakdownDayRow[] => rows.map((r) => ({ date: r.date, dimension: r.dimension, value: r.value, ...basicRow(r) }))),
+    meta
+      ? []
+      : fetchAll((a, b) =>
+          db
+            .from("insights_search_term_daily")
+            .select(`campaign_id, date, search_term, match_type, ${BASIC_COLUMNS}`)
+            .in("ad_account_id", ids)
+            .gte("date", cur.from)
+            .lte("date", cur.to)
+            .order("campaign_id")
+            .order("date")
+            .order("search_term")
+            .order("match_type")
+            .range(a, b),
+        ).then((rows): SearchTermDayRow[] => rows.map((r) => ({ campaignId: r.campaign_id, date: r.date, searchTerm: r.search_term, matchType: r.match_type, ...basicRow(r) }))),
+    meta
+      ? []
+      : fetchAll((a, b) => db.from("ad_products").select("id, title, category, image_url, price").in("ad_account_id", ids).order("id").range(a, b)).then((rows) =>
+          rows.map((r) => ({ id: r.id, title: r.title, category: r.category, imageUrl: r.image_url, price: opt(r.price) })),
+        ),
+    meta
+      ? []
+      : fetchAll((a, b) =>
+          db.from("insights_product_daily").select(`product_id, date, ${BASIC_COLUMNS}`).in("ad_account_id", ids).gte("date", cur.from).lte("date", cur.to).order("product_id").order("date").range(a, b),
+        ).then((rows): ProductDayRow[] => rows.map((r) => ({ productId: r.product_id, date: r.date, ...basicRow(r) }))),
+  ]);
+
+  return { platform: q.platform, current: cur, previous: prev, accountDaily, campaigns, campaignDaily, ads, adDaily, breakdownDaily, searchTermDaily, products, productDaily };
+}

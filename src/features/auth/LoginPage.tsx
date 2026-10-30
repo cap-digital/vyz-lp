@@ -1,18 +1,18 @@
 "use client";
 
-// Tela de entrada (Brand Showcase, pág. 17). Fase 1, sem backend: e-mail e
-// Google só avisam que o login precisa do Supabase; o painel de demonstração
-// abre direto.
+// Tela de entrada (Brand Showcase, pág. 17): e-mail e senha ou Google. A
+// sessão nasce no servidor (cookies httpOnly); aqui só o formulário. Sem
+// JavaScript o formulário também funciona (Server Action com useActionState).
 
-import { Info } from "lucide-react";
 import Link from "next/link";
-import { useId, useState, type FormEvent } from "react";
-import { Icon } from "@/components/brand/Icon";
-import { Wordmark } from "@/components/brand/Wordmark";
+import { useActionState, useId } from "react";
+import { PendingChip } from "@/components/ui/kit";
 import { btn } from "@/components/ui/styles";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
-
-const NOTICE = "Login precisa do Supabase";
+import { signIn, signInWithGoogle } from "@/server/auth/actions";
+import { AuthCard, authLink } from "./AuthShell";
+import { AuthInput, FormAlert, PasswordInput, useFocusFirstInvalid } from "./fields";
+import { GOOGLE_PENDING, type GoogleStatus } from "./google";
+import type { Notice } from "./messages";
 
 function GoogleMark() {
   return (
@@ -25,104 +25,82 @@ function GoogleMark() {
   );
 }
 
-/** Fundo: malha de construção do logo e o wordmark em contorno, bem claro. */
-function LogoGrid() {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div
-        className="absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_75%)]"
-        style={{
-          backgroundImage: "linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-          backgroundPosition: "center center",
-        }}
-      />
-      <div className="absolute -right-[12vw] -bottom-[6vw] w-[min(1100px,120vw)] opacity-70 [&_polygon]:fill-none [&_polygon]:stroke-line [&_polygon]:[stroke-width:0.035]">
-        <Wordmark decorative className="text-line" />
-      </div>
-    </div>
-  );
-}
-
-export function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [notice, setNotice] = useState(false);
+export function LoginPage({ next, google, notice = null }: { next: string; google: GoogleStatus; notice?: Notice | null }) {
   const id = useId();
+  // permalink: sem JavaScript o estado volta pela URL, para o formulário do
+  // fallback (casca estática) e o do conteúdo, que têm posições diferentes.
+  const [state, signInAction, signingIn] = useActionState(signIn, null, "/entrar");
+  const [googleState, googleAction, openingGoogle] = useActionState(signInWithGoogle.bind(null, next), null, "/entrar");
+  const formRef = useFocusFirstInvalid(state);
 
-  const pending = (e?: FormEvent) => {
-    e?.preventDefault();
-    setNotice(true);
-  };
+  const fields = state?.ok === false ? state.error.fields : undefined;
+  const error = state?.ok === false && !fields ? state.error.message : googleState?.ok === false ? googleState.error.message : null;
+  const googleOff = google === "disabled";
+  const busy = signingIn || openingGoogle;
+  const googleForm = `${id}-google`;
 
   return (
-    <div className="relative isolate flex min-h-dvh flex-col bg-bg">
-      <LogoGrid />
-      <header className="relative flex h-16 items-center justify-between px-4 sm:px-6 lg:px-10">
-        <Link href="/" aria-label="VYZ, voltar ao site" className="block w-[72px]">
-          <Wordmark decorative />
-        </Link>
-        <ThemeToggle className="size-10" />
-      </header>
-
-      <main className="relative flex flex-1 items-center justify-center px-4 pt-4 pb-16 sm:px-6">
-        <div className="w-full max-w-[560px]">
-          <section aria-labelledby={`${id}-t`} className="rounded-[20px] border border-line bg-card p-6 sm:p-8">
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-7">
-              <div className="w-16 shrink-0 sm:w-[88px]">
-                <Icon background="#4B5320" className="text-[#E8ECE1]" radius={24} />
-              </div>
-              <form onSubmit={pending} className="min-w-0 flex-1" noValidate>
-                <h1 id={`${id}-t`} className="text-[22px] leading-tight font-semibold tracking-[-0.01em] text-fg">
-                  Entrar no VYZ
-                </h1>
-                <label htmlFor={`${id}-e`} className="sr-only">
-                  E-mail
-                </label>
-                <input
-                  id={`${id}-e`}
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  placeholder="nome@empresa.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-4 h-12 w-full rounded-[10px] border border-line bg-field px-4 text-[15px] text-fg outline-none placeholder:text-fg-2/70 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
-                />
-                <div className="mt-3 grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-[auto_1fr]">
-                  <button type="submit" className={`${btn.primary} rounded-[10px]`}>
-                    Continuar
-                  </button>
-                  <button type="button" onClick={() => pending()} className={`${btn.secondary} rounded-[10px]`}>
-                    <GoogleMark /> Entrar com Google
-                  </button>
-                </div>
-                <p role="status" aria-live="polite" className="min-h-0">
-                  {notice && (
-                    <span className="mt-3 inline-flex items-center gap-1.5 rounded-chip border border-dashed border-line px-2.5 py-1 text-[12.5px] text-fg-2">
-                      <Info size={13} aria-hidden className="shrink-0" />
-                      {NOTICE}
-                    </span>
-                  )}
-                </p>
-              </form>
-            </div>
-
-            <div className="mt-7 border-t border-line pt-6">
-              <Link href="/painel" className={`${btn.secondary} w-full rounded-[10px]`}>
-                Acessar o painel de demonstração
-              </Link>
-              <p className="mt-2 text-center text-[12.5px] text-fg-2">Dados de exemplo, salvos só neste navegador.</p>
-            </div>
-          </section>
-
-          <p className="mt-5 text-center text-[14px] text-fg-2">
+    <AuthCard
+      title="Entrar no VYZ"
+      footer={
+        <>
+          <p>
             Ainda não tem conta?{" "}
-            <Link href="/#monte-seu-plano" className="font-semibold text-accent underline-offset-4 hover:underline">
-              Monte seu plano
+            <Link href="/assinar" className={authLink}>
+              Assine
             </Link>
           </p>
+          <p>
+            <Link href="/#planos" className="underline-offset-4 hover:text-fg hover:underline">
+              Ver planos e preços
+            </Link>
+          </p>
+        </>
+      }
+    >
+      <form ref={formRef} action={signInAction} noValidate className="mt-4 space-y-3">
+        {notice && !state && <FormAlert tone={notice.tone}>{notice.message}</FormAlert>}
+        <input type="hidden" name="next" value={next} />
+        <AuthInput
+          label="E-mail"
+          hideLabel
+          name="email"
+          type="email"
+          inputMode="email"
+          autoComplete="username"
+          placeholder="nome@empresa.com"
+          defaultValue={state?.values?.email}
+          error={fields?.email}
+        />
+        <PasswordInput label="Senha" hideLabel name="password" autoComplete="current-password" placeholder="Senha" error={fields?.password} />
+        <p className="text-right text-[13px]">
+          <Link href="/recuperar-senha" className="text-fg-2 underline-offset-4 hover:text-accent hover:underline">
+            Esqueci minha senha
+          </Link>
+        </p>
+        <div className="grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-[auto_1fr]">
+          <button type="submit" disabled={busy} className={`${btn.primary} rounded-[10px]`}>
+            {signingIn ? "Entrando…" : "Entrar"}
+          </button>
+          <button
+            type="submit"
+            form={googleForm}
+            disabled={busy || googleOff}
+            aria-describedby={googleOff ? `${id}-google-aviso` : undefined}
+            className={`${btn.secondary} rounded-[10px]`}
+          >
+            <GoogleMark /> {openingGoogle ? "Abrindo o Google…" : "Entrar com Google"}
+          </button>
         </div>
-      </main>
-    </div>
+        {error && <FormAlert>{error}</FormAlert>}
+        {googleOff && (
+          <p id={`${id}-google-aviso`}>
+            <PendingChip label={GOOGLE_PENDING.label} detail={GOOGLE_PENDING.detail} />
+          </p>
+        )}
+      </form>
+      {/* Formulário à parte: o botão do Google não envia e-mail nem senha. */}
+      <form id={googleForm} action={googleAction} hidden />
+    </AuthCard>
   );
 }

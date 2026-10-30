@@ -1,5 +1,5 @@
 // Contrato do cérebro do VYZ. Hoje só existe o LocalEngine (intenções em
-// PT-BR, dados da demo); um LlmEngine futuro entra pela mesma interface.
+// PT-BR, contexto montado no servidor); um LlmEngine futuro entra pela mesma interface.
 
 import type { Totals } from "@/features/metrics/compute";
 import type { Entitlements, Tier } from "@/features/pricing/entitlements";

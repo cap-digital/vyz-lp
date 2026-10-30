@@ -6,13 +6,13 @@ import { Switch } from "@/components/ui/controls";
 import { PendingChip, Tabs } from "@/components/ui/kit";
 import { PeriodPicker, rangeDays, type Range } from "@/components/ui/PeriodPicker";
 import { PLATFORMS } from "@/features/accounts/platforms";
-import { onColor } from "@/features/landing-pages/LandingRenderer";
 import { dashboardTemplate } from "@/features/templates/dashboards";
 import { PAGES } from "@/features/templates/pages";
 import type { PageId } from "@/features/templates/types";
 import { ATTRIBUTIONS, periodDays, PERIODS, type DashboardSettings, type PeriodId } from "@/features/workspace/types";
 import type { Brand } from "@/features/workspace/workspace";
 import { ddmmyyyy } from "@/lib/format";
+import { brandVars } from "./brand";
 import { datasetFor, pageLayout } from "./data";
 import { PageView } from "./widgets/PageView";
 import { makeContext } from "./widgets/Widgets";
@@ -21,13 +21,12 @@ export type DashboardSpec = { templateId: string; name: string; client: string; 
 
 /** Variáveis de cor da marca própria (Personalizado), iguais nos dois modos. */
 export function brandStyle(brand?: Brand): CSSProperties | undefined {
-  if (!brand?.color) return undefined;
-  return { "--accent": brand.color, "--on-accent": onColor(brand.color) } as CSSProperties;
+  return brandVars(brand?.color);
 }
 
 export function BrandMark({ brand }: { brand?: Brand }) {
   if (brand?.logo) {
-    // eslint-disable-next-line @next/next/no-img-element -- dataURL local
+    // eslint-disable-next-line @next/next/no-img-element -- logo do workspace (Storage público), tamanho livre
     return <img src={brand.logo} alt="Logo" className="h-8 w-auto max-w-[160px] object-contain" />;
   }
   if (brand?.hideVyz) return null;
@@ -78,7 +77,7 @@ export function DashboardBody({ spec, hideSpend, assemble, actions, printing }: 
                 </span>
               ))}
               <span className="rounded-chip bg-accent-soft px-2 py-0.5 text-[11.5px] font-medium text-fg">Amostra · dados fictícios</span>
-              <PendingChip label="Dados reais precisam de conexão" detail="Quando as contas forem conectadas (OAuth), os mesmos widgets passam a ler os números reais." />
+              {actions && <PendingChip label="Modelo com dados de exemplo" detail="Os números são fictícios. Para os números das suas contas, crie um dashboard Meta Ads ou Google Ads · E-commerce." />}
             </div>
           </div>
         </div>
