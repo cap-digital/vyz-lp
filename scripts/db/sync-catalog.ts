@@ -73,6 +73,7 @@ async function main() {
         agent_voice: e.agentVoice,
         max_dashboards: e.maxDashboards,
         max_landing_pages: e.maxLandingPages,
+        max_members: e.maxMembers,
       };
     });
     await tx`insert into public.plan_entitlements ${tx(entitlements)}
@@ -80,7 +81,8 @@ async function main() {
         dashboard_templates = excluded.dashboard_templates, landing_templates = excluded.landing_templates,
         platforms = excluded.platforms, pages_plan_id = excluded.pages_plan_id, white_label = excluded.white_label,
         audio = excluded.audio, custom_dashboards = excluded.custom_dashboards, agent_chat = excluded.agent_chat,
-        agent_voice = excluded.agent_voice, max_dashboards = excluded.max_dashboards, max_landing_pages = excluded.max_landing_pages`;
+        agent_voice = excluded.agent_voice, max_dashboards = excluded.max_dashboards, max_landing_pages = excluded.max_landing_pages,
+        max_members = excluded.max_members`;
     counts.plan_entitlements = entitlements.length;
 
     const prices = PRICED.flatMap((plan) =>

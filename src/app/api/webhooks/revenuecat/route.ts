@@ -1,12 +1,14 @@
-// POST /api/webhooks/revenuecat: compras na loja (App Store / Google Play)
-// creditam o usuário. O RevenueCat manda "Authorization: <REVENUECAT_WEBHOOK_SECRET>"
+// POST /api/webhooks/revenuecat: compras na loja (App Store / Google Play).
+// Créditos: cada transação credita uma vez. Planos (vyz_<plano>_<período>_<contas>):
+// qualquer evento relê o estado no RevenueCat e grava a assinatura do workspace. O RevenueCat manda "Authorization: <REVENUECAT_WEBHOOK_SECRET>"
 // (configurado no painel dele). O app_user_id é o id do usuário no Supabase
 // (o app chama Purchases.logIn(userId) ao entrar). Idempotente: cada evento é
 // gravado uma vez e cada transação da loja credita uma vez.
 
 import { timingSafeEqual } from "node:crypto";
-import { creditsFor } from "@vyz/shared";
+import { creditsFor, parseStorePlan } from "@vyz/shared";
 import { z } from "zod";
+import { syncStoreSubscription } from "@/server/billing/store";
 import { serverEnv } from "@/server/env";
 import { createAdminSupabase } from "@/server/supabase/admin";
 
@@ -16,6 +18,7 @@ const Event = z.object({
     type: z.string(),
     app_user_id: z.string().optional(),
     product_id: z.string().optional(),
+    new_product_id: z.string().nullish(),
     transaction_id: z.string().optional(),
     store: z.string().optional(),
   }),
@@ -44,11 +47,30 @@ export async function POST(request: Request) {
   if (inserted.error?.code === "23505") return Response.json({ ok: true, duplicate: true });
   if (inserted.error) return Response.json({ error: "store" }, { status: 500 });
 
+  const userId = z.uuid().safeParse(e.app_user_id).success ? e.app_user_id! : null;
+
+  // plano: o estado vem da API do RevenueCat (eventos fora de ordem dão no mesmo)
+  if (userId && (parseStorePlan(e.product_id) || parseStorePlan(e.new_product_id))) {
+    try {
+      await syncStoreSubscription(userId);
+      await admin.from("store_events").update({ processed_at: new Date().toISOString() }).eq("id", e.id);
+      return Response.json({ ok: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // sem workspace ou com plano do site: não adianta repetir
+      if (message.startsWith("store:")) {
+        await admin.from("store_events").update({ error: message }).eq("id", e.id);
+        return Response.json({ ok: false, error: message });
+      }
+      // o RevenueCat repete; apaga o registro para o reenvio ser processado
+      await admin.from("store_events").delete().eq("id", e.id);
+      return Response.json({ error: "store_sync" }, { status: 500 });
+    }
+  }
+
   const credits = e.product_id ? creditsFor(e.product_id) : null;
   const isPurchase = e.type === "NON_RENEWING_PURCHASE" || e.type === "INITIAL_PURCHASE";
   const isRefund = e.type === "CANCELLATION" && raw?.event?.cancel_reason === "CUSTOMER_SUPPORT";
-  const userId = z.uuid().safeParse(e.app_user_id).success ? e.app_user_id! : null;
-
   if (credits && userId && e.transaction_id && (isPurchase || isRefund)) {
     const { error } = await admin.rpc("credit_store_purchase", {
       p_event_id: e.id,

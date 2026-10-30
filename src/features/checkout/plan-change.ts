@@ -74,7 +74,7 @@ export function quotePlanChange(input: {
 export const samePlan = (a: PlanSelection, b: PlanSelection) => a.tier === b.tier && a.period === b.period && a.accounts === b.accounts;
 
 /** O que o workspace usa hoje (workspace_usage + plataformas das contas ativas). */
-export type PlanUsage = { billableAccounts: number; dashboards: number; publishedLandingPages: number; enabledPlatforms: string[] };
+export type PlanUsage = { billableAccounts: number; dashboards: number; publishedLandingPages: number; enabledPlatforms: string[]; /** membros + convites pendentes */ members?: number };
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -98,6 +98,12 @@ export function planChangeBlocker(next: PlanSelection, usage: PlanUsage): { code
     return {
       code: "limit:landing_pages_in_use",
       message: `O ${tier} permite até ${plural(limits.maxLandingPages, "landing page publicada", "landing pages publicadas")} e você tem ${usage.publishedLandingPages}. Despublique antes de trocar.`,
+    };
+  }
+  if ((usage.members ?? 0) > limits.maxMembers) {
+    return {
+      code: "limit:members_in_use",
+      message: `O ${tier} permite até ${plural(limits.maxMembers, "usuário", "usuários")} e a equipe tem ${usage.members}. Remova pessoas ou cancele convites antes de trocar.`,
     };
   }
   const outside = usage.enabledPlatforms.map((id) => PLATFORMS[id as PlatformId]).find((p) => p && !canUse(next.tier, p.tier));

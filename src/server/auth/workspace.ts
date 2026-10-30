@@ -67,6 +67,7 @@ function toEntitlements(row: Tables<"workspace_access"> | null): Entitlements | 
     agentVoice: !!row.agent_voice,
     maxDashboards: row.max_dashboards,
     maxLandingPages: row.max_landing_pages,
+    maxMembers: row.max_members ?? 1,
   };
 }
 

@@ -5,7 +5,7 @@
 ```
 /                       site + LP + painel (Next.js) — inclui a API do app
   src/app/api/v1/       API do app: me, workspaces/:id/dashboards, dashboards/:id, account (DELETE), push-tokens
-  src/app/api/webhooks/revenuecat/   compras da loja → créditos
+  src/app/api/webhooks/revenuecat/   compras da loja → créditos e assinatura do plano
   src/server/auth/bearer.ts          autenticação "Authorization: Bearer <jwt do Supabase>" (mesmo RLS do site)
 packages/shared/        tipos da API, produtos de crédito, termos proibidos no iOS (usado pelos dois)
 apps/mobile/            app Expo (React Native) com ios/ e android/ no repositório (prebuild)
@@ -18,7 +18,8 @@ apps/mobile/            app Expo (React Native) com ios/ e android/ no repositó
 - **Login:** e-mail/senha; Google nativo (idToken); Apple nativo no iOS (nonce SHA-256). Os tokens viram sessão via `signInWithIdToken`. Sem modo convidado.
 - **Exclusão de conta:** Conta → Excluir conta → `DELETE /api/v1/account`. A propriedade dos workspaces passa a outro membro; sem equipe, a assinatura é encerrada. Faturas ficam (fiscal), sem vínculo pessoal.
 - **Compras:** créditos só pela loja (RevenueCat). O webhook credita em `credit_ledger` (só cresce); o saldo (`credit_balances`) vale no app e no site. Produtos em `packages/shared/src/credits.ts`.
-- **Assinatura do plano:** não é vendida no app (o app não mostra preço nem leva a pagamento fora). Quem já assina usa o app com a mesma conta.
+- **Assinatura do plano:** vendida também no app, pela loja (RevenueCat), com a MESMA regra do site: plano + período + contas (1 a 30), mesmo preço. Cada combinação é um produto `vyz_<plano>_<mensal|anual>_<contas>` (180 ao todo, num único grupo de assinaturas); a lista com preços sai de `npx tsx scripts/store/plan-products.ts`. Antes da compra o app chama `POST /api/v1/workspaces/:id/store-plan` (só o dono; workspace sem plano do site); o webhook relê o estado em `GET /v1/subscribers/:id` (precisa de `REVENUECAT_SECRET_API_KEY`) e grava em `subscriptions` (`sync_store_subscription`). Plano contratado no site muda só no site (o app avisa, sem link).
+- **Usuários por plano:** Base 1, Pro 2, Avançado 5 (`maxMembers` em entitlements.ts). O banco recusa convite ou membro acima do limite (convites pendentes contam).
 - **Push:** token nativo (APNs/FCM) salvo em `push_tokens`; o envio sai do nosso backend.
 
 ## Rodar no simulador

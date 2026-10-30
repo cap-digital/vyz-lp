@@ -39,6 +39,8 @@ const MESSAGES: Record<string, string> = {
   "limit:dashboards": "Você chegou ao limite de dashboards do seu plano.",
   "limit:landing_pages": "Você chegou ao limite de landing pages publicadas do seu plano.",
   "limit:accounts": "Você chegou ao limite de contas contratadas no seu plano.",
+  "limit:members": "Você chegou ao limite de usuários do seu plano.",
+  "limit:members_in_use": "Há mais pessoas na equipe do que o novo plano permite. Remova algumas antes.",
   "workspace:last_owner": "O workspace precisa de pelo menos um dono.",
   "dashboard:source_platform": "Essa conta não é de uma plataforma deste dashboard.",
   "dashboard:template_unavailable": "Este template não está disponível.",

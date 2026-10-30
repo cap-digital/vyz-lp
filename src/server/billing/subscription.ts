@@ -37,9 +37,17 @@ async function loadLiveSubscription(db: DB, workspaceId: string) {
 
 /** O que já está em uso cabe no plano novo? (contas ativas, dashboards, LPs publicadas, plataformas) */
 async function assertUsageFits(db: DB, workspaceId: string, next: PlanSelection) {
-  const [usage, enabled] = await Promise.all([
+  const [usage, enabled, members, invites] = await Promise.all([
     db.from("workspace_usage").select("dashboards, published_landing_pages, billable_accounts").eq("workspace_id", workspaceId).maybeSingle(),
     db.from("ad_accounts").select("platform_id").eq("workspace_id", workspaceId).eq("is_enabled", true),
+    db.from("workspace_members").select("user_id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    db
+      .from("workspace_invitations")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .is("accepted_at", null)
+      .is("revoked_at", null)
+      .gt("expires_at", new Date().toISOString()),
   ]);
   const u = unwrap(usage);
   const blocker = planChangeBlocker(next, {
@@ -47,6 +55,7 @@ async function assertUsageFits(db: DB, workspaceId: string, next: PlanSelection)
     dashboards: u?.dashboards ?? 0,
     publishedLandingPages: u?.published_landing_pages ?? 0,
     enabledPlatforms: (unwrap(enabled) ?? []).map((a) => a.platform_id),
+    members: (members.count ?? 0) + (invites.count ?? 0),
   });
   if (blocker) throw appError(blocker.code, blocker.message);
 }
@@ -56,6 +65,7 @@ const IN_USE_ADVICE: Record<string, string> = {
   "limit:accounts_in_use": "Desative contas em Contas antes de trocar.",
   "limit:dashboards_in_use": "Apague alguns dashboards antes de trocar.",
   "limit:landing_pages_in_use": "Despublique algumas landing pages antes de trocar.",
+  "limit:members_in_use": "Remova pessoas ou cancele convites em Equipe antes de trocar.",
 };
 
 /** Erro da change_subscription no formato da tela. */

@@ -32,6 +32,8 @@ const Schema = z
     STRIPE_SECRET_KEY: optional,
     /** Segredo do webhook do RevenueCat (compras no app). */
     REVENUECAT_WEBHOOK_SECRET: optional,
+    /** Chave secreta da API do RevenueCat (sk_...): lê o estado da assinatura da loja. */
+    REVENUECAT_SECRET_API_KEY: optional,
     STRIPE_WEBHOOK_SECRET: optional,
     META_APP_ID: optional,
     META_APP_SECRET: optional,

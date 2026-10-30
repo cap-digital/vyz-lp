@@ -6,7 +6,21 @@ export type MeResponse = {
   user: { id: string; email: string | null; fullName: string; avatarUrl: string | null };
   defaultWorkspaceId: string | null;
   credits: number;
-  workspaces: { id: string; name: string; role: "viewer" | "member" | "admin" | "owner"; onboardingDone: boolean; plan: string | null; hasAccess: boolean }[];
+  workspaces: {
+    id: string;
+    name: string;
+    role: "viewer" | "member" | "admin" | "owner";
+    onboardingDone: boolean;
+    plan: string | null;
+    hasAccess: boolean;
+    /** Onde o plano foi contratado: no site muda no site; na loja muda no app. */
+    planSource: "site" | "app_store" | "play_store" | null;
+    period: "mensal" | "anual" | null;
+    accounts: number;
+    cancelAtPeriodEnd: boolean;
+    periodEnd: string | null;
+    maxMembers: number;
+  }[];
 };
 
 export type DashboardSummary = { id: string; name: string; clientName: string; templateId: string; period: string; updatedAt: string };

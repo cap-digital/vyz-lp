@@ -2049,6 +2049,7 @@ export type Database = {
           agent_voice: boolean
           max_dashboards: number
           max_landing_pages: number
+          max_members: number
           updated_at: string
         }
         Insert: {
@@ -2079,6 +2080,7 @@ export type Database = {
           agent_voice?: boolean
           max_dashboards?: number
           max_landing_pages?: number
+          max_members?: number
           updated_at?: string
         }
         Relationships: [
@@ -2604,6 +2606,24 @@ export type Database = {
           },
         ]
       }
+      store_customers: {
+        Row: {
+          user_id: string
+          workspace_id: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          workspace_id: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          workspace_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       store_events: {
         Row: {
           id: string
@@ -3093,6 +3113,8 @@ export type Database = {
           max_dashboards: number | null
           max_landing_pages: number | null
           hide_vyz_brand_effective: boolean | null
+          max_members: number | null
+          provider: Database["public"]["Enums"]["billing_provider"] | null
         }
         Relationships: []
       }
@@ -3158,6 +3180,20 @@ export type Database = {
           p_settings?: Json
           p_page_type_ids?: string[]
           p_ad_account_ids?: string[]
+        }
+        Returns: string
+      }
+      sync_store_subscription: {
+        Args: {
+          p_user_id: string
+          p_store: string
+          p_plan_id: string
+          p_interval: Database["public"]["Enums"]["billing_interval"]
+          p_accounts: number
+          p_status: Database["public"]["Enums"]["subscription_status"]
+          p_period_start: string
+          p_period_end: string
+          p_cancel_at_period_end: boolean
         }
         Returns: string
       }
@@ -3260,7 +3296,7 @@ export type Database = {
     }
     Enums: {
       billing_interval: "month" | "year"
-      billing_provider: "mock" | "stripe"
+      billing_provider: "mock" | "stripe" | "app_store" | "play_store"
       checkout_status: "open" | "completed" | "expired" | "canceled"
       connection_status: "active" | "expired" | "revoked" | "error"
       integration_provider: "meta" | "google"
@@ -3293,7 +3329,7 @@ export const Constants = {
   public: {
     Enums: {
       billing_interval: ["month", "year"],
-      billing_provider: ["mock", "stripe"],
+      billing_provider: ["mock", "stripe", "app_store", "play_store"],
       checkout_status: ["open", "completed", "expired", "canceled"],
       connection_status: ["active", "expired", "revoked", "error"],
       integration_provider: ["meta", "google"],

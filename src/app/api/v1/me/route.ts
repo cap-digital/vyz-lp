@@ -13,14 +13,28 @@ export async function GET(request: Request) {
     db.from("credit_balances").select("balance").eq("user_id", userId).maybeSingle(),
   ]);
   const ids = (members.data ?? []).map((m) => m.workspace.id);
-  const access = ids.length ? await db.from("workspace_access").select("workspace_id, plan_id, has_access").in("workspace_id", ids) : { data: [] };
+  const access = ids.length ? await db.from("workspace_access").select("workspace_id, plan_id, has_access, provider, interval, accounts_quantity, cancel_at_period_end, current_period_end, max_members").in("workspace_id", ids) : { data: [] };
   return apiJson({
     user: { id: userId, email: profile.data?.email ?? session.email, fullName: profile.data?.full_name ?? "", avatarUrl: profile.data?.avatar_url ?? null },
     credits: credits.data?.balance ?? 0,
     defaultWorkspaceId: profile.data?.default_workspace_id ?? ids[0] ?? null,
     workspaces: (members.data ?? []).map((m) => {
       const a = access.data?.find((x) => x.workspace_id === m.workspace.id);
-      return { id: m.workspace.id, name: m.workspace.name, role: m.role, onboardingDone: m.workspace.onboarding_step === "done", plan: a?.plan_id ?? null, hasAccess: !!a?.has_access };
+      const source = !a?.plan_id ? null : a.provider === "app_store" || a.provider === "play_store" ? a.provider : "site";
+      return {
+        id: m.workspace.id,
+        name: m.workspace.name,
+        role: m.role,
+        onboardingDone: m.workspace.onboarding_step === "done",
+        plan: a?.plan_id ?? null,
+        hasAccess: !!a?.has_access,
+        planSource: source,
+        period: a?.interval === "year" ? "anual" : a?.interval === "month" ? "mensal" : null,
+        accounts: a?.accounts_quantity ?? 0,
+        cancelAtPeriodEnd: !!a?.cancel_at_period_end,
+        periodEnd: a?.current_period_end ?? null,
+        maxMembers: a?.max_members ?? 1,
+      };
     }),
   });
 }
