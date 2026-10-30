@@ -105,4 +105,12 @@ describe("webhook RevenueCat", () => {
     expect(res.status).toBe(200);
     expect(calls.some((c) => c.op.startsWith("rpc:"))).toBe(false);
   });
+  it("evento TEST real do RevenueCat (campos null) responde 200", async () => {
+    const POST = await load({ REVENUECAT_WEBHOOK_SECRET: "s" });
+    const res = await POST(
+      req("s", { id: "e8", type: "TEST", app_user_id: "$RCAnonymousID:abc", product_id: "test_product", transaction_id: null, original_transaction_id: null, store: "APP_STORE", new_product_id: null, environment: "SANDBOX" }),
+    );
+    expect(res.status).toBe(200);
+    expect(calls.some((c) => c.op.startsWith("rpc:"))).toBe(false);
+  });
 });
