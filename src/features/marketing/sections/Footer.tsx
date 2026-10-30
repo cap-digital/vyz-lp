@@ -1,6 +1,7 @@
 "use client";
 
 import { useInView } from "motion/react";
+import Link from "next/link";
 import { useRef, useSyncExternalStore } from "react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
@@ -28,6 +29,10 @@ export function Footer() {
           <p className="tnum">
             Simulação · não é cobrança{year ? ` · ${year}` : ""}
           </p>
+          <nav className="flex gap-5">
+            <Link href="/termos" className="transition-colors hover:text-accent">Termos de Uso</Link>
+            <Link href="/privacidade" className="transition-colors hover:text-accent">Privacidade</Link>
+          </nav>
           <a
             href={waLink(MSG_SPECIALIST)}
             target="_blank"

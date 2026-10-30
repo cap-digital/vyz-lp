@@ -1,13 +1,15 @@
-// Conta: saldo de créditos, compra pela loja, sair e excluir a conta.
+// Conta: plano do workspace, saldo de créditos, compras pela loja, sair e excluir a conta.
 
 import type { MeResponse } from "@vyz/shared";
 import { useEffect, useState } from "react";
-import { Alert, ScrollView, Text } from "react-native";
+import { Alert, Linking, ScrollView, Text } from "react-native";
 import type { PurchasesPackage } from "react-native-purchases";
 import { api } from "@/lib/api";
+import { ENV } from "@/lib/env";
 import { useAuth } from "@/lib/auth";
 import { buy, creditPackages } from "@/lib/purchases";
 import { Button, Card, Notice } from "@/ui/kit";
+import { PlanCard } from "@/ui/PlanCard";
 import { useTheme } from "@/ui/theme";
 
 export default function Conta() {
@@ -39,6 +41,8 @@ export default function Conta() {
     }
   };
 
+  const workspace = me?.workspaces.find((w) => w.id === me.defaultWorkspaceId) ?? me?.workspaces[0];
+
   const confirmDelete = () =>
     Alert.alert("Excluir conta", "Sua conta e seus dados de acesso serão apagados. Isso não pode ser desfeito.", [
       { text: "Cancelar", style: "cancel" },
@@ -60,6 +64,7 @@ export default function Conta() {
         <Text style={{ color: t.fg, fontSize: 17, fontWeight: "600" }}>{me?.user.fullName || "Sua conta"}</Text>
         <Text style={{ color: t.fg2 }}>{me?.user.email}</Text>
       </Card>
+      {workspace ? <PlanCard key={workspace.id} workspace={workspace} onChanged={() => setTimeout(refresh, 1500)} /> : null}
       <Card>
         <Text style={{ color: t.fg2, fontSize: 13 }}>Créditos</Text>
         <Text style={{ color: t.fg, fontSize: 28, fontWeight: "700" }}>{me?.credits ?? 0}</Text>
@@ -68,6 +73,8 @@ export default function Conta() {
         ))}
       </Card>
       <Notice text={message} tone="info" />
+      <Button tone="secondary" label="Termos de Uso" onPress={() => void Linking.openURL(`${ENV.apiUrl}/termos`)} />
+      <Button tone="secondary" label="Política de Privacidade" onPress={() => void Linking.openURL(`${ENV.apiUrl}/privacidade`)} />
       <Button tone="secondary" label="Sair" onPress={() => void auth.signOut()} />
       <Button tone="danger" label="Excluir conta" busy={busy === "delete"} onPress={confirmDelete} />
     </ScrollView>

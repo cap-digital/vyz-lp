@@ -25,6 +25,11 @@ export default function CheckoutLayout({ children }: { children: React.ReactNode
         <a href={waLink(MSG_SPECIALIST)} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent underline-offset-4 hover:underline">
           Fale com um especialista no WhatsApp
         </a>
+        <span className="mt-2 block">
+          Ao assinar, você concorda com os{" "}
+          <Link href="/termos" className="underline-offset-4 hover:underline">Termos de Uso</Link> e a{" "}
+          <Link href="/privacidade" className="underline-offset-4 hover:underline">Política de Privacidade</Link>.
+        </span>
       </footer>
     </div>
   );
