@@ -2049,8 +2049,8 @@ export type Database = {
           agent_voice: boolean
           max_dashboards: number
           max_landing_pages: number
-          max_members: number
           updated_at: string
+          max_members: number
         }
         Insert: {
           plan_id: string
@@ -2066,6 +2066,7 @@ export type Database = {
           max_dashboards: number
           max_landing_pages: number
           updated_at?: string
+          max_members?: number
         }
         Update: {
           plan_id?: string
@@ -2080,8 +2081,8 @@ export type Database = {
           agent_voice?: boolean
           max_dashboards?: number
           max_landing_pages?: number
-          max_members?: number
           updated_at?: string
+          max_members?: number
         }
         Relationships: [
           {
@@ -2622,7 +2623,15 @@ export type Database = {
           workspace_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "store_customers_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       store_events: {
         Row: {
@@ -3183,20 +3192,6 @@ export type Database = {
         }
         Returns: string
       }
-      sync_store_subscription: {
-        Args: {
-          p_user_id: string
-          p_store: string
-          p_plan_id: string
-          p_interval: Database["public"]["Enums"]["billing_interval"]
-          p_accounts: number
-          p_status: Database["public"]["Enums"]["subscription_status"]
-          p_period_start: string
-          p_period_end: string
-          p_cancel_at_period_end: boolean
-        }
-        Returns: string
-      }
       credit_store_purchase: {
         Args: {
           p_event_id: string
@@ -3292,6 +3287,20 @@ export type Database = {
           p_ad_account_ids: string[]
         }
         Returns: number
+      }
+      sync_store_subscription: {
+        Args: {
+          p_user_id: string
+          p_store: string
+          p_plan_id: string
+          p_interval: Database["public"]["Enums"]["billing_interval"]
+          p_accounts: number
+          p_status: Database["public"]["Enums"]["subscription_status"]
+          p_period_start: string
+          p_period_end: string
+          p_cancel_at_period_end: boolean
+        }
+        Returns: string
       }
     }
     Enums: {
